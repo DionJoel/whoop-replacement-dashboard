@@ -90,6 +90,8 @@ Ziel: Lokaler MCP‑Server stellt Claude Tools für die DB bereit. Ein separater
 [ ] Task 4.4 — Cronometer-MCP & Claude Desktop Anbindung
 * Den vorkonfigurierten Community-MCP-Server cronometer-api-mcp herunterladen.
 * Beide Server in die lokale claude_desktop_config.json auf dem Mac eintragen (Cronometer-Credentials dort hinterlegen).
+* Hinweis: Cronometer hat keine offizielle öffentliche API. Deshalb ist hier ein privater Web-Login-/Export-Wrapper nötig.
+* Empfehlung: Baue nur den minimal benötigten Endpunkt, z. B. für `daily_summary`, `servings` oder `biometrics`, statt das ganze Cronometer-MCP-Projekt zu übernehmen.
 
 Meilenstein: Claude Desktop starten. Das Tools‑Icon (Hammer) muss sowohl get_fitness_trends als auch die Cronometer-Tools (Ernährungsdaten) fehlerfrei anzeigen.
 

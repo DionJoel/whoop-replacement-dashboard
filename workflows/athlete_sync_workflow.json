@@ -1,0 +1,337 @@
+{
+  "name": "Athlete Sync Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6 * * *"
+            }
+          ]
+        }
+      },
+      "id": "trigger",
+      "name": "Schedule Trigger (06:00 AM)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [250, 200]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "url": "https://www.polaraccesslink.com/v2/users/me/sleep",
+        "options": {
+          "headers": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "id": "polar",
+      "name": "Get Polar Sleep Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 100],
+      "credentials": {
+        "oAuth2Api": {
+          "id": "polar_oauth2_credential_id",
+          "field": "oauth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=INSERT INTO polar_metrics (timestamp, hrv_rmssd, resting_heart_rate, sleep_score, cardio_load)\nVALUES (\n  '{{ $json.sleep && $json.sleep[0] ? $json.sleep[0].date : $now }}',\n  {{ $json.sleep && $json.sleep[0] ? $json.sleep[0].hrv_rmssd : 'NULL' }},\n  {{ $json.sleep && $json.sleep[0] ? $json.sleep[0].resting_heart_rate : 'NULL' }},\n  {{ $json.sleep && $json.sleep[0] ? $json.sleep[0].sleep_score : 'NULL' }},\n  NULL\n)\nON CONFLICT DO NOTHING;"
+      },
+      "id": "polar_insert",
+      "name": "Insert Polar Metrics",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.2,
+      "position": [720, 100],
+      "credentials": {
+        "postgres": {
+          "id": "timescaledb_credential_id",
+          "field": "postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "none",
+        "url": "https://intervals.icu/api/v1/athlete/0/wellness",
+        "options": {
+          "headers": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{$env.INTERVALS_API_TOKEN}}"
+            }
+          ]
+        }
+      },
+      "id": "intervals",
+      "name": "Get Intervals Wellness",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 250]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=INSERT INTO intervals_metrics (timestamp, ctl, atl, tsb, fitness_score, fatigue_score)\nVALUES (\n  '{{ $json.date }}',\n  {{ $json.ctl ?? 'NULL' }},\n  {{ $json.atl ?? 'NULL' }},\n  {{ $json.tsb ?? 'NULL' }},\n  {{ $json.fitness_score ?? 'NULL' }},\n  {{ $json.fatigue_score ?? 'NULL' }}\n)\nON CONFLICT DO NOTHING;"
+      },
+      "id": "intervals_insert",
+      "name": "Insert Intervals Metrics",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.2,
+      "position": [720, 250],
+      "credentials": {
+        "postgres": {
+          "id": "timescaledb_credential_id",
+          "field": "postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "none",
+        "url": "https://habitica.com/api/v3/tasks/user",
+        "options": {
+          "headers": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "x-api-user",
+              "value": "{{$env.HABITICA_USER_ID}}"
+            },
+            {
+              "name": "x-api-key",
+              "value": "{{$env.HABITICA_API_TOKEN}}"
+            }
+          ]
+        }
+      },
+      "id": "habitica",
+      "name": "Get Habitica Tasks",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 400]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=INSERT INTO habitica_events (timestamp, user_id, task_id, task_type, completed, score, notes)\nVALUES (\n  '{{ $json.updatedAt || $json.date }}',\n  '{{ $json.userId || $json.user_id || '' }}',\n  '{{ $json.id || '' }}',\n  '{{ $json.type || '' }}',\n  {{ $json.completed ? 'TRUE' : 'FALSE' }},\n  {{ $json.score ?? 'NULL' }},\n  '{{ $json.notes || '' }}'\n)\nON CONFLICT DO NOTHING;"
+      },
+      "id": "habitica_insert",
+      "name": "Insert Habitica Events",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.2,
+      "position": [720, 400],
+      "credentials": {
+        "postgres": {
+          "id": "timescaledb_credential_id",
+          "field": "postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "none",
+        "url": "https://api.hevy.com/v1/athlete/workouts",
+        "options": {
+          "headers": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{$env.HEVY_API_KEY}}"
+            }
+          ]
+        }
+      },
+      "id": "hevy",
+      "name": "Get Hevy Workouts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 550]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=INSERT INTO hevy_workouts (timestamp, workout_id, exercise_name, volume_kg, reps, rpe)\nVALUES (\n  '{{ $json.start_time || $json.date }}',\n  '{{ $json.id || $json.workout_id || '' }}',\n  '{{ $json.exercise_name || '' }}',\n  {{ $json.volume_kg ?? 'NULL' }},\n  {{ $json.reps ?? 'NULL' }},\n  {{ $json.rpe ?? 'NULL' }}\n)\nON CONFLICT DO NOTHING;"
+      },
+      "id": "hevy_insert",
+      "name": "Insert Hevy Workouts",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.2,
+      "position": [720, 550],
+      "credentials": {
+        "postgres": {
+          "id": "timescaledb_credential_id",
+          "field": "postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "url": "https://wbsapi.withings.net/measure",
+        "options": {
+          "headers": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "action",
+              "value": "getmeas"
+            }
+          ]
+        }
+      },
+      "id": "withings",
+      "name": "Get Withings Measurements",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 700],
+      "credentials": {
+        "oAuth2Api": {
+          "id": "withings_oauth2_credential_id",
+          "field": "oauth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=INSERT INTO withings_metrics (timestamp, weight_kg, body_fat_percent, muscle_mass_kg, hydration_percent)\nVALUES (\n  '{{ $json.measuregrps && $json.measuregrps[0] ? $json.measuregrps[0].date : $now }}',\n  {{ $json.measuregrps && $json.measuregrps[0] ? $json.measuregrps[0].measures.find(m => m.type === 1)?.value / Math.pow(10, $json.measuregrps[0].measures.find(m => m.type === 1)?.unit) : 'NULL' }},\n  {{ $json.measuregrps && $json.measuregrps[0] ? $json.measuregrps[0].measures.find(m => m.type === 6)?.value / Math.pow(10, $json.measuregrps[0].measures.find(m => m.type === 6)?.unit) : 'NULL' }},\n  {{ $json.measuregrps && $json.measuregrps[0] ? $json.measuregrps[0].measures.find(m => m.type === 8)?.value / Math.pow(10, $json.measuregrps[0].measures.find(m => m.type === 8)?.unit) : 'NULL' }},\n  {{ $json.measuregrps && $json.measuregrps[0] ? $json.measuregrps[0].measures.find(m => m.type === 9)?.value / Math.pow(10, $json.measuregrps[0].measures.find(m => m.type === 9)?.unit) : 'NULL' }}\n)\nON CONFLICT DO NOTHING;"
+      },
+      "id": "withings_insert",
+      "name": "Insert Withings Metrics",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.2,
+      "position": [720, 700],
+      "credentials": {
+        "postgres": {
+          "id": "timescaledb_credential_id",
+          "field": "postgres"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger (06:00 AM)": {
+      "main": [
+        [
+          {
+            "node": "Get Polar Sleep Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Intervals Wellness",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Habitica Tasks",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Hevy Workouts",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Withings Measurements",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Polar Sleep Data": {
+      "main": [
+        [
+          {
+            "node": "Insert Polar Metrics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Intervals Wellness": {
+      "main": [
+        [
+          {
+            "node": "Insert Intervals Metrics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Habitica Tasks": {
+      "main": [
+        [
+          {
+            "node": "Insert Habitica Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Hevy Workouts": {
+      "main": [
+        [
+          {
+            "node": "Insert Hevy Workouts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Withings Measurements": {
+      "main": [
+        [
+          {
+            "node": "Insert Withings Metrics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

@@ -157,6 +157,16 @@ ENV/
 env.bak/
 venv.bak/
 
+# Node / TypeScript / MCP server
+node_modules/
+mcp-server/node_modules/
+mcp-server/dist/
+
+# Local Docker data
+timescaledb_data/
+n8n_data/
+ollama_data/
+
 # Spyder project settings
 .spyderproject
 .spyproject
