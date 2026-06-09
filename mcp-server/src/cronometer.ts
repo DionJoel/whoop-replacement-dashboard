@@ -1,3 +1,6 @@
+import { chromium } from 'playwright-chromium';
+import { ProxyAgent } from 'undici';
+
 const LOGIN_HTML_URL = 'https://cronometer.com/login/';
 const LOGIN_API_URL = 'https://cronometer.com/login';
 const GWT_BASE_URL = 'https://cronometer.com/cronometer/app';
@@ -32,6 +35,24 @@ type CronometerExportType = keyof typeof EXPORT_TYPES;
 
 type CronometerCookies = Record<string, string>;
 
+type CronometerDiagnosticsResult = {
+  status: 'ok' | 'failed';
+  proxyUrl?: string;
+  loginPageFetch: {
+    status?: number;
+    blocked: boolean;
+    error?: string;
+    snippet?: string;
+  };
+  browserPage?: {
+    status?: number;
+    blocked: boolean;
+    loginFormFound?: boolean;
+    submitButtonFound?: boolean;
+    error?: string;
+  };
+};
+
 function parseSetCookieHeader(header: string): Record<string, string> {
   const cookie: Record<string, string> = {};
   const [rawCookie] = header.split(';');
@@ -47,6 +68,9 @@ function parseSetCookieHeader(header: string): Record<string, string> {
 function isoDate(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
+
+const BROWSER_USER_AGENT =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36';
 
 export class CronometerError extends Error {
   constructor(
@@ -90,10 +114,12 @@ class CronometerClient {
   private userId = '';
   private gwtPermutation = DEFAULT_GWT_PERMUTATION;
   private gwtHeader = DEFAULT_GWT_HEADER;
+  private proxyUrl?: string;
 
   constructor(username?: string, password?: string) {
     this.username = username ?? process.env.CRONOMETER_USERNAME ?? '';
     this.password = password ?? process.env.CRONOMETER_PASSWORD ?? '';
+    this.proxyUrl = process.env.CRONOMETER_PROXY_URL ?? undefined;
 
     if (!this.username || !this.password) {
       throw new Error(
@@ -106,6 +132,21 @@ class CronometerClient {
     return Object.entries(this.cookies)
       .map(([name, value]) => `${name}=${value}`)
       .join('; ');
+  }
+
+  private get requestDispatcher(): ProxyAgent | undefined {
+    if (!this.proxyUrl) {
+      return undefined;
+    }
+    return new ProxyAgent(this.proxyUrl);
+  }
+
+  private async safePageText(page: any): Promise<string> {
+    try {
+      return (await page.textContent('body')) ?? '';
+    } catch {
+      return '';
+    }
   }
 
   private updateCookies(response: Response): void {
@@ -121,6 +162,23 @@ class CronometerClient {
 
   private async request(url: string, init: RequestInit = {}): Promise<Response> {
     const headers: Record<string, string> = {
+      'User-Agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36',
+      Accept:
+        'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+      'Accept-Language': 'de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7,bg;q=0.6',
+      'Accept-Encoding': 'gzip, deflate, br, zstd',
+      'Cache-Control': 'no-cache',
+      Pragma: 'no-cache',
+      Referer: 'https://cronometer.com/',
+      'Sec-Fetch-Dest': 'document',
+      'Sec-Fetch-Mode': 'navigate',
+      'Sec-Fetch-Site': 'none',
+      'Sec-Fetch-User': '?1',
+      'Upgrade-Insecure-Requests': '1',
+      'Sec-CH-UA': '"Google Chrome";v="149", "Chromium";v="149", "Not)A;Brand";v="24"',
+      'Sec-CH-UA-Mobile': '?0',
+      'Sec-CH-UA-Platform': '"Windows"',
       ...(init.headers as Record<string, string> | undefined),
     };
 
@@ -129,11 +187,17 @@ class CronometerClient {
     }
 
     try {
-      const response = await fetch(url, {
+      const requestOptions: any = {
         ...init,
         headers,
-        redirect: 'manual',
-      });
+        redirect: init.redirect ?? 'follow',
+      };
+
+      if (this.requestDispatcher) {
+        requestOptions.dispatcher = this.requestDispatcher;
+      }
+
+      const response = await fetch(url, requestOptions);
 
       this.updateCookies(response);
       return response;
@@ -167,6 +231,99 @@ class CronometerClient {
     }
 
     return match[1];
+  }
+
+  private async checkBrowserResponseAccess(response: any | null, page: any): Promise<void> {
+    if (!response) {
+      throw new CronometerError(
+        'Cronometer browser login failed: no response when loading login page',
+        502,
+        'browser_login_failed'
+      );
+    }
+
+    const status = typeof response.status === 'function' ? response.status() : response.status;
+    if (status === 401 || status === 403 || status === 451) {
+      const bodyText = (await page.textContent('body')) ?? '';
+      throw new CronometerError(
+        `Cronometer browser login blocked by HTTP ${status}. ${bodyText.includes('403') || bodyText.includes('Forbidden') ? 'The host or network is blocked from accessing Cronometer.' : ''}`,
+        502,
+        'cronometer_access_blocked'
+      );
+    }
+  }
+
+  private async browserLogin(): Promise<void> {
+    let browser;
+    try {
+      browser = await chromium.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      });
+      const context = await browser.newContext({
+        userAgent: BROWSER_USER_AGENT,
+        proxy: this.proxyUrl ? { server: this.proxyUrl } : undefined,
+      });
+      const page = await context.newPage();
+
+      const response = await page.goto(LOGIN_HTML_URL, { waitUntil: 'networkidle' });
+      await this.checkBrowserResponseAccess(response, page);
+
+      const userField = page.locator(
+        'input[name="username"], input[name="email"], input[type="email"], input[type="text"], input[id*="user"], input[name*="user"]'
+      );
+      const passField = page.locator('input[name="password"], input[type="password"], input[id*="pass"], input[name*="pass"]');
+      if ((await userField.count()) === 0 || (await passField.count()) === 0) {
+        throw new CronometerError(
+          'Cronometer login form could not be found in browser mode',
+          502,
+          'login_form_missing'
+        );
+      }
+
+      await userField.fill(this.username);
+      await passField.fill(this.password);
+
+      const button = page.locator(
+        'button[type="submit"], input[type="submit"], button:has-text("Log in"), button:has-text("Login"), input[value*="Log in"], input[value*="Login"]'
+      ).first();
+      if (await button.count() === 0) {
+        throw new CronometerError(
+          'Cronometer submit button could not be found in browser mode',
+          502,
+          'login_button_missing'
+        );
+      }
+
+      await Promise.all([
+        page.waitForNavigation({ waitUntil: 'networkidle', timeout: 20000 }),
+        button.click(),
+      ]);
+
+      const cookies = await context.cookies();
+      this.cookies = Object.fromEntries(cookies.map((c) => [c.name, c.value]));
+      this.nonce = this.cookies.sesnonce ?? '';
+
+      if (!this.nonce) {
+        throw new CronometerError(
+          'Browser login succeeded but no sesnonce cookie was received',
+          502,
+          'missing_session_cookie'
+        );
+      }
+    } catch (error: any) {
+      throw error instanceof CronometerError
+        ? error
+        : new CronometerError(
+            `Browser login failed: ${error?.message ?? 'unknown'}`,
+            502,
+            'browser_login_failed'
+          );
+    } finally {
+      if (browser) {
+        await browser.close();
+      }
+    }
   }
 
   private async login(): Promise<void> {
@@ -313,8 +470,111 @@ class CronometerClient {
     }
 
     await this.discoverGwtHashes();
-    await this.login();
-    await this.gwtAuthenticate();
+
+    try {
+      await this.login();
+    } catch (error: any) {
+      if (error instanceof CronometerError && error.kind === 'login_page_unavailable') {
+        await this.browserLogin();
+      } else {
+        throw error;
+      }
+    }
+
+    if (!this.userId) {
+      await this.gwtAuthenticate();
+    }
+  }
+
+  async getDiagnostics(): Promise<CronometerDiagnosticsResult> {
+    const diagnostics: CronometerDiagnosticsResult = {
+      status: 'ok',
+      proxyUrl: this.proxyUrl,
+      loginPageFetch: {
+        blocked: false,
+      },
+    };
+
+    try {
+      const response = await this.request(LOGIN_HTML_URL, { method: 'GET' });
+      diagnostics.loginPageFetch.status = response.status;
+      const body = await response.text();
+      diagnostics.loginPageFetch.snippet = body.slice(0, 800).replace(/\s+/g, ' ').trim();
+      if ([401, 403, 451].includes(response.status)) {
+        diagnostics.loginPageFetch.blocked = true;
+        diagnostics.status = 'failed';
+      }
+      if (!response.ok) {
+        diagnostics.loginPageFetch.error = `Login page returned status ${response.status}`;
+        diagnostics.status = 'failed';
+      }
+    } catch (error: any) {
+      diagnostics.loginPageFetch.error = error?.message ?? 'Unknown network error';
+      diagnostics.loginPageFetch.blocked = true;
+      diagnostics.status = 'failed';
+      return diagnostics;
+    }
+
+    let browser: any;
+    try {
+      browser = await chromium.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      });
+      const context = await browser.newContext({
+        userAgent: BROWSER_USER_AGENT,
+        proxy: this.proxyUrl ? { server: this.proxyUrl } : undefined,
+      });
+      const page = await context.newPage();
+      const browserResponse = await page.goto(LOGIN_HTML_URL, { waitUntil: 'networkidle', timeout: 20000 });
+      const status = typeof browserResponse?.status === 'function' ? browserResponse.status() : browserResponse?.status;
+      const blocked = [401, 403, 451].includes(status);
+      diagnostics.browserPage = {
+        status,
+        blocked,
+        loginFormFound: false,
+        submitButtonFound: false,
+      };
+
+      if (blocked) {
+        diagnostics.browserPage.error = `Browser login page blocked by HTTP ${status}`;
+        diagnostics.status = 'failed';
+      } else {
+        const userField = page.locator(
+          'input[name="username"], input[name="email"], input[type="email"], input[type="text"], input[id*="user"], input[name*="user"]'
+        );
+        const passField = page.locator('input[name="password"], input[type="password"], input[id*="pass"], input[name*="pass"]');
+        const button = page.locator(
+          'button[type="submit"], input[type="submit"], button:has-text("Log in"), button:has-text("Login"), input[value*="Log in"], input[value*="Login"]'
+        ).first();
+
+        diagnostics.browserPage.loginFormFound = (await userField.count()) > 0 && (await passField.count()) > 0;
+        diagnostics.browserPage.submitButtonFound = (await button.count()) > 0;
+
+        if (!diagnostics.browserPage.loginFormFound) {
+          diagnostics.browserPage.error = 'Login form fields could not be detected in browser mode';
+          diagnostics.status = 'failed';
+        }
+        if (!diagnostics.browserPage.submitButtonFound) {
+          diagnostics.browserPage.error = diagnostics.browserPage.error
+            ? `${diagnostics.browserPage.error}; submit button not found`
+            : 'Submit button could not be detected in browser mode';
+          diagnostics.status = 'failed';
+        }
+      }
+    } catch (error: any) {
+      diagnostics.browserPage = {
+        blocked: false,
+        error: error?.message ?? 'Browser inspection failed',
+      };
+      diagnostics.status = 'failed';
+    } finally {
+      if (browser) {
+        await browser.close();
+      }
+    }
+
+    return diagnostics;
   }
 
   async exportRaw(
@@ -363,6 +623,11 @@ export async function fetchCronometerHealth(): Promise<{ status: string }> {
   const client = new CronometerClient();
   await client.ensureAuthenticated();
   return { status: 'ok' };
+}
+
+export async function fetchCronometerDiagnostics(): Promise<CronometerDiagnosticsResult> {
+  const client = new CronometerClient();
+  return client.getDiagnostics();
 }
 
 export async function fetchCronometerExport(

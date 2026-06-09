@@ -3,7 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { Pool } from 'pg';
 import { exchangePolarCode, fetchPolarSleep, getPolarAuthUrl, refreshPolarToken } from './polar';
-import { CronometerError, fetchCronometerExport, fetchCronometerHealth } from './cronometer';
+import { CronometerError, fetchCronometerExport, fetchCronometerHealth, fetchCronometerDiagnostics } from './cronometer';
 
 dotenv.config();
 
@@ -130,6 +130,16 @@ app.get('/cronometer/health', async (_, res) => {
     res.json(health);
   } catch (error) {
     console.error('Cronometer health failed:', error);
+    sendErrorResponse(res, error);
+  }
+});
+
+app.get('/cronometer/debug', async (_, res) => {
+  try {
+    const diagnostics = await fetchCronometerDiagnostics();
+    res.json(diagnostics);
+  } catch (error) {
+    console.error('Cronometer diagnostics failed:', error);
     sendErrorResponse(res, error);
   }
 });

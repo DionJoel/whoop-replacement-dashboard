@@ -13,6 +13,8 @@ Das System nutzt einen **Hybrid-Ansatz**: Eine Docker-Infrastruktur (n8n + Times
    - `POSTGRES_DB`
    - `WEBHOOK_URL`
    - optional `MCP_SERVER_PORT`
+   - optional `CRONOMETER_USERNAME`
+   - optional `CRONOMETER_PASSWORD`
 3. Starte die Infrastruktur:
    - lokal: `docker compose up -d`
    - über Portainer: Repo als Stack einbinden und den Stack starten
@@ -49,9 +51,12 @@ Der MCP-Server stellt jetzt einfache Polar-AccessLink-Endpunkte bereit:
 Zusätzlich gibt es jetzt eine schlanke Cronometer-Integration (kein offizieller API-Zugriff):
 
 - `GET /cronometer/health` – prüft, ob Cronometer mit den Login-Daten authentifiziert werden kann
+- `GET /cronometer/debug` – führt eine Diagnose durch und zeigt Login-, Browser- und Proxy-Status
 - `GET /cronometer/export?type=daily_summary&start=2026-06-01&end=2026-06-07` – lädt einen CSV-Export von Cronometer
 Fehlerhandling:
 - Ungültiger Exporttyp liefert `400` mit `invalid_export_type`
+- Cronometer-Zugriffe können von der Host-Umgebung oder dem Netzwerk blockiert werden; dies wird als `502` mit `cronometer_access_blocked` gemeldet
+- Optional: `CRONOMETER_PROXY_URL` kann gesetzt werden, wenn Cronometer aus deinem aktuellen Netzwerk blockiert ist
 - Ungültiges Datum liefert `400` mit `invalid_date`
 - Login-Probleme oder falsche Anmeldedaten liefern `401` bzw. `502` mit einem klaren Fehlercode
 - Netzwerk- oder Cronometer-Serverfehler werden als `502` mit `network_error` / `export_failed` ausgegeben
