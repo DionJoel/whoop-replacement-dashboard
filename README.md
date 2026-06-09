@@ -61,7 +61,17 @@ Fehlerhandling:
 - Login-Probleme oder falsche Anmeldedaten liefern `401` bzw. `502` mit einem klaren Fehlercode
 - Netzwerk- oder Cronometer-Serverfehler werden als `502` mit `network_error` / `export_failed` ausgegeben
 Du kannst diese Endpunkte ebenfalls als lokale Hilfs-API nutzen, um Cronometer-Daten in deine n8n-Workflows oder das MCP-Setup einzubauen.
+## 📊 Intervals.icu Integration
 
+Intervals.icu-Endpunkte stellen deine Trainingsdaten (Fitness/Form, Aktivitäten) über HTTP zur Verfügung:
+
+- `GET /intervals/athlete` – gibt Athleten-Profildaten zurück (Name, Gewicht, Ruhepuls, etc.)
+- `GET /intervals/fitness?start=2026-06-01&end=2026-06-07` – liefert CTL/ATL/TSB-Werte (JSON)
+- `GET /intervals/fitness-csv?start=2026-06-01&end=2026-06-07` – liefert CTL/ATL/TSB als CSV
+- `GET /intervals/activities?start=2026-06-01&end=2026-06-07` – liefert Trainingsaktivitäten (JSON)
+- `GET /intervals/activities-csv?start=2026-06-01&end=2026-06-07` – liefert Aktivitäten als CSV
+
+Anforderung: `API_KEY`, `INTERVALS_KEY` und `ATHLETE_ID` müssen in `.env` gesetzt sein.
 ## �📌 Portainer-Hinweis
 
 Wenn du Portainer verwendest, kannst du diesen Ordner als Git-Repo-Stack einbinden. Wichtig:

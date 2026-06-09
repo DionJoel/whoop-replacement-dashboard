@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import { Pool } from 'pg';
 import { exchangePolarCode, fetchPolarSleep, getPolarAuthUrl, refreshPolarToken } from './polar';
 import { CronometerError, fetchCronometerExport, fetchCronometerHealth, fetchCronometerDiagnostics } from './cronometer';
+import { IntervalsError, fetchIntervalsAthlete, fetchIntervalsFitness, fetchIntervalsActivities, exportIntervalsFitnessCsv, exportIntervalsActivitiesCsv } from './intervals';
 
 dotenv.config();
 
@@ -69,6 +70,118 @@ app.get('/polar/auth-url', (_, res) => {
   }
 });
 
+app.get('/polar/auth', async (_, res) => {
+  const authUrl = getPolarAuthUrl();
+  
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Polar OAuth Setup</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 700px; margin: 50px auto; padding: 20px; }
+    .card { border: 1px solid #ddd; padding: 20px; border-radius: 8px; margin: 20px 0; }
+    .step { margin: 20px 0; padding: 15px; background: #f9f9f9; border-left: 4px solid #007bff; }
+    .step-num { font-weight: bold; color: #007bff; font-size: 1.2em; }
+    input, button { padding: 10px; margin: 5px 0; font-size: 14px; }
+    input { width: 100%; box-sizing: border-box; }
+    button { background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+    button:hover { background: #0056b3; }
+    .code-box { background: #f0f0f0; padding: 10px; border-radius: 4px; word-break: break-all; margin: 10px 0; font-family: monospace; }
+    .success { color: green; }
+    .error { color: red; }
+  </style>
+</head>
+<body>
+  <h1>🔐 Polar OAuth Setup</h1>
+  
+  <div class="step">
+    <span class="step-num">Step 1:</span> Open this link and authorize the app (do NOT use localhost URL if it fails):
+    <div class="code-box">
+      <a href="${authUrl}" target="_blank" style="color: #007bff; text-decoration: underline;">
+        Click here to authorize with Polar
+      </a>
+    </div>
+  </div>
+  
+  <div class="step">
+    <span class="step-num">Step 2:</span> After authorization, Polar redirects to a URL you can't access.
+    <br>Look at the URL bar - copy the <strong>code</strong> parameter.<br>
+    <strong>Example:</strong> http://localhost:3000/polar/callback?<strong style="background: yellow;">code=abc123xyz</strong>
+  </div>
+  
+  <div class="step">
+    <span class="step-num">Step 3:</span> Paste the code here:
+    <input type="text" id="code" placeholder="Paste code from URL bar" />
+    <button onclick="exchangeCode()">Exchange Code for Tokens</button>
+  </div>
+  
+  <div id="result"></div>
+  
+  <script>
+    async function exchangeCode() {
+      const code = document.getElementById('code').value.trim();
+      if (!code) {
+        document.getElementById('result').innerHTML = '<p class="error">❌ Code is required</p>';
+        return;
+      }
+      
+      try {
+        const response = await fetch(\`/polar/exchange-code?code=\${encodeURIComponent(code)}\`);
+        const data = await response.json();
+        
+        if (response.ok) {
+          document.getElementById('result').innerHTML = \`
+            <div class="card">
+              <h2 class="success">✓ Success!</h2>
+              <p>Copy these values to your <strong>.env</strong> file:</p>
+              
+              <p><strong>POLAR_ACCESS_TOKEN</strong></p>
+              <input type="text" value="\${data.access_token}" readonly onclick="this.select()">
+              
+              <p><strong>POLAR_REFRESH_TOKEN</strong></p>
+              <input type="text" value="\${data.refresh_token}" readonly onclick="this.select()">
+              
+              <p><small>Token expires in \${data.expires_in} seconds</small></p>
+            </div>
+          \`;
+        } else {
+          document.getElementById('result').innerHTML = \`<p class="error">❌ Error: \${data.error}</p>\`;
+        }
+      } catch (e) {
+        document.getElementById('result').innerHTML = \`<p class="error">❌ Request failed: \${e.message}</p>\`;
+      }
+    }
+  </script>
+</body>
+</html>
+  `;
+  
+  res.setHeader('Content-Type', 'text/html');
+  res.send(html);
+});
+
+app.get('/polar/exchange-code', async (req, res) => {
+  try {
+    const code = req.query.code as string;
+    if (!code) {
+      return res.status(400).json({ error: 'code parameter is required' });
+    }
+
+    const tokenData = await exchangePolarCode(code);
+    
+    res.json({
+      access_token: tokenData.access_token,
+      refresh_token: tokenData.refresh_token,
+      expires_in: tokenData.expires_in,
+      instructions: 'Copy access_token and refresh_token into .env as POLAR_ACCESS_TOKEN and POLAR_REFRESH_TOKEN'
+    });
+  } catch (error: any) {
+    console.error('Polar exchange-code failed:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/polar/callback', async (req, res) => {
   try {
     const code = req.query.code as string;
@@ -77,10 +190,56 @@ app.get('/polar/callback', async (req, res) => {
     }
 
     const tokenData = await exchangePolarCode(code);
-    res.json(tokenData);
+    
+    // Return HTML with tokens for easy copying
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Polar OAuth Success</title>
+  <style>
+    body { font-family: monospace; max-width: 600px; margin: 50px auto; padding: 20px; }
+    .success { color: green; font-weight: bold; }
+    .code { background: #f0f0f0; padding: 10px; border-radius: 5px; word-break: break-all; margin: 10px 0; }
+    input { width: 100%; padding: 8px; margin: 5px 0; }
+    button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1 class="success">✓ Polar Authorization Successful!</h1>
+  <p>Copy these values into your <code>.env</code> file:</p>
+  
+  <label><strong>POLAR_ACCESS_TOKEN</strong></label>
+  <input type="text" value="${tokenData.access_token}" readonly>
+  
+  <label><strong>POLAR_REFRESH_TOKEN</strong></label>
+  <input type="text" value="${tokenData.refresh_token}" readonly>
+  
+  <hr>
+  <p><small>Or paste directly into .env:</small></p>
+  <pre class="code">POLAR_ACCESS_TOKEN=${tokenData.access_token}
+POLAR_REFRESH_TOKEN=${tokenData.refresh_token}</pre>
+  
+  <button onclick="navigator.clipboard.writeText('POLAR_ACCESS_TOKEN=${tokenData.access_token}\\nPOLAR_REFRESH_TOKEN=${tokenData.refresh_token}')">Copy to Clipboard</button>
+  <button onclick="window.close()">Close</button>
+</body>
+</html>
+    `;
+    
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
   } catch (error: any) {
     console.error('Polar callback failed:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).send(`
+<!DOCTYPE html>
+<html>
+<head><title>Polar OAuth Error</title></head>
+<body>
+  <h1 style="color: red;">❌ Polar Authorization Failed</h1>
+  <p>${error.message}</p>
+</body>
+</html>
+    `);
   }
 });
 
@@ -116,6 +275,8 @@ app.get('/polar/sleep', async (_, res) => {
 
 function sendErrorResponse(res: express.Response, error: unknown): void {
   if (error instanceof CronometerError) {
+    res.status(error.statusCode).json({ error: error.message, code: error.kind });
+  } else if (error instanceof IntervalsError) {
     res.status(error.statusCode).json({ error: error.message, code: error.kind });
   } else if (error instanceof Error) {
     res.status(500).json({ error: error.message, code: 'internal_error' });
@@ -154,6 +315,69 @@ app.get('/cronometer/export', async (req, res) => {
     res.type('text/plain').send(csvData);
   } catch (error) {
     console.error('Cronometer export failed:', error);
+    sendErrorResponse(res, error);
+  }
+});
+
+app.get('/intervals/athlete', async (_, res) => {
+  try {
+    const athlete = await fetchIntervalsAthlete();
+    res.json(athlete);
+  } catch (error) {
+    console.error('Intervals athlete fetch failed:', error);
+    sendErrorResponse(res, error);
+  }
+});
+
+app.get('/intervals/fitness', async (req, res) => {
+  try {
+    // Support both 'start'/'end' and 'oldest'/'newest' parameter naming
+    const start = (req.query.start ?? req.query.oldest) as string | undefined;
+    const end = (req.query.end ?? req.query.newest) as string | undefined;
+
+    const fitness = await fetchIntervalsFitness(start, end);
+    res.json(fitness);
+  } catch (error) {
+    console.error('Intervals fitness fetch failed:', error);
+    sendErrorResponse(res, error);
+  }
+});
+
+app.get('/intervals/fitness-csv', async (req, res) => {
+  try {
+    const start = (req.query.start ?? req.query.oldest) as string | undefined;
+    const end = (req.query.end ?? req.query.newest) as string | undefined;
+
+    const csvData = await exportIntervalsFitnessCsv(start, end);
+    res.type('text/plain').send(csvData);
+  } catch (error) {
+    console.error('Intervals fitness CSV export failed:', error);
+    sendErrorResponse(res, error);
+  }
+});
+
+app.get('/intervals/activities', async (req, res) => {
+  try {
+    const start = (req.query.start ?? req.query.oldest) as string | undefined;
+    const end = (req.query.end ?? req.query.newest) as string | undefined;
+
+    const activities = await fetchIntervalsActivities(start, end);
+    res.json(activities);
+  } catch (error) {
+    console.error('Intervals activities fetch failed:', error);
+    sendErrorResponse(res, error);
+  }
+});
+
+app.get('/intervals/activities-csv', async (req, res) => {
+  try {
+    const start = (req.query.start ?? req.query.oldest) as string | undefined;
+    const end = (req.query.end ?? req.query.newest) as string | undefined;
+
+    const csvData = await exportIntervalsActivitiesCsv(start, end);
+    res.type('text/plain').send(csvData);
+  } catch (error) {
+    console.error('Intervals activities CSV export failed:', error);
     sendErrorResponse(res, error);
   }
 });
