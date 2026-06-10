@@ -1,58 +1,75 @@
+version: '3.8'
+
 services:
   timescaledb:
     image: timescale/timescaledb:latest-pg15
     container_name: timescaledb
-    restart: always
     env_file:
       - .env
     environment:
-      - POSTGRES_USER
-      - POSTGRES_PASSWORD
-      - POSTGRES_DB
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-whoop_dashboard}
     volumes:
-      - ./timescaledb_data:/var/lib/postgresql/data
-      - ./init-db:/docker-entrypoint-initdb.d # Automatisches SQL-Setup
+      - timescaledb_data:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d
     ports:
       - "5432:5432"
+    restart: unless-stopped
 
   n8n:
     image: docker.n8n.io/n8nio/n8n:latest
     container_name: n8n
-    restart: always
-    ports:
-      - "5678:5678"
     env_file:
       - .env
     environment:
-      - WEBHOOK_URL
       - DB_TYPE=postgresdb
-      - DB_POSTGRESDB_HOST=timescaledb
+      - DB_POSTGRESDB_HOST=${DB_HOST:-timescaledb}
       - DB_POSTGRESDB_PORT=5432
       - DB_POSTGRESDB_DATABASE=${POSTGRES_DB}
       - DB_POSTGRESDB_USER=${POSTGRES_USER}
       - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
+      - WEBHOOK_URL=${WEBHOOK_URL}
+      - GENERIC_TIMEZONE=Europe/Berlin
     volumes:
       - n8n_data:/home/node/.n8n
+    ports:
+      - "5678:5678"
+    restart: unless-stopped
     depends_on:
       - timescaledb
 
-  mcp-server:
-    build:
-      context: ./mcp-server
-      dockerfile: Dockerfile
-    container_name: mcp-server
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
     restart: unless-stopped
+
+  mcp-server:
+    image: node:20-alpine
+    container_name: mcp-server
+    working_dir: /app
+    volumes:
+      - ./mcp-server:/app
+    command: sh -c "npm install && npm start"
     ports:
       - "3000:3000"
     env_file:
       - .env
     environment:
-      - DB_HOST=timescaledb
+      - DB_HOST=${DB_HOST:-timescaledb}
       - DB_PORT=5432
-      - POSTGRES_DB
-      - POSTGRES_USER
-      - POSTGRES_PASSWORD
-      - MCP_SERVER_PORT=3000
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - MCP_SERVER_PORT=${MCP_SERVER_PORT:-3000}
+      - POLAR_CLIENT_ID
+      - POLAR_CLIENT_SECRET
+      - POLAR_REDIRECT_URI
+      - POLAR_SCOPE
       - CRONOMETER_PROXY_URL
       - CRONOMETER_USERNAME
       - CRONOMETER_PASSWORD
@@ -62,6 +79,9 @@ services:
       - INTERVALS_API_BASE_URL
     depends_on:
       - timescaledb
+    restart: unless-stopped
 
 volumes:
+  timescaledb_data:
   n8n_data:
+  ollama_data:

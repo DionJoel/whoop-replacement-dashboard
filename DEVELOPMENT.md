@@ -10,14 +10,17 @@ Dieses Konzept beschreibt den schrittweisen Implementierungsplan für das hybrid
 [APIs: Polar, Hevy, Intervals, Habitica, Withings]
                        |  (Cron‑Pulls über n8n)
                        v
-           [TimescaleDB (Hypertables)]
-                 |             |
-                 | (SQL-Views) | (Direkt-Query)
-                 v             v
-          [Local Ollama]   [MCP-Server] <---> [Cronometer-MCP (App-API)]
-                 |             |
-                 v (Markdown)  v (On-Demand Tools)
-          [Obsidian Mobile] [Claude Desktop / Mac]
+      [Externe TimescaleDB (Bestehender Stack)]
+                 |                     |
+                 | (SQL-Views)         | (Direkt-Query)
+                 v                     v
+    [n8n Daily Trigger (9 Uhr)]    [MCP-Server] <---> [Cronometer-MCP (App-API)]
+                 |                     |
+                 v (Prompt)            v (On-Demand Tools)
+          [Local Ollama]          [Claude Desktop / Mac]
+                 |
+                 v (Markdown E-Mail)
+          [E-Mail Newsletter]
 Sprints — Überblick
 Sprint 1 — Lokale Infrastruktur & Datenbank (Basis)
 Ziel: Die Docker‑Umgebung läuft stabil auf dem Fujitsu Mini‑PC. TimescaleDB und Ollama sind initialisiert; alle Tabellen, Hypertables und Views werden automatisch erzeugt.
@@ -36,7 +39,7 @@ Ziel: Die Docker‑Umgebung läuft stabil auf dem Fujitsu Mini‑PC. TimescaleDB
 * In Portainer als Stack via Git‑Repo einbinden.
 * docker-compose.yml um den Ollama-Service und das lokale Volume ollama_data erweitern.
 * Lokale .env mit Passwörtern befüllen und Stack starten.
-* Modell laden: Per SSH auf den Fujitsu schalten und das Modell via docker exec -it ollama ollama run llama3 initial herunterladen.
+* Modell laden: Per SSH auf den Fujitsu schalten und das Modell via docker exec -it ollama ollama run gemma4:e4b-qat initial herunterladen.
 
 Meilenstein: Mit einem DB‑Client (z. B. DBeaver) verbinden, Existenz der Tabellen/Views prüfen und Test-Ping an Ollama-API (http://<fujitsu-ip>:11434) absetzen.
 
@@ -100,11 +103,11 @@ Ziel: Das System agiert vollautark. n8n triggert die lokale LLM im Hintergrund, 
 
 [ ] Task 5.1 — System‑Prompt & Structured Output für Ollama
 * In n8n die Advanced AI Nodes (Basic LLM Chain + Ollama Model) einbinden.
-* System-Prompt für Llama 3 definieren: Fokus auf tabellarische Wochenübersicht, Sport-Empfehlung (unter Berücksichtigung von Regeneration, Cross-X-Volumen und Gewicht) sowie Uni-Lernfenster.
+* System-Prompt für Gemma 4 definieren: Fokus auf tabellarische Wochenübersicht, Sport-Empfehlung (unter Berücksichtigung von Regeneration, Cross-X-Volumen und Gewicht) sowie Uni-Lernfenster.
 * Structured Output Parser vorschalten, um reines Markdown ohne Smalltalk zu garantieren.
 
 [ ] Task 5.2 — Automatischer Obsidian-Export via n8n
-* n8n-Knoten konfigurieren, der das von Llama 3 generierte Markdown abgreift und als Datei (00_Athletik_Dashboard.md) direkt in dein lokales Obsidian-Vault auf dem Server schreibt.
+* n8n-Knoten konfigurieren, der das von Gemma 4 generierte Markdown abgreift und als Datei (00_Athletik_Dashboard.md) direkt in dein lokales Obsidian-Vault auf dem Server schreibt.
 * Synchronisation (z. B. Obsidian Sync / Git) prüfen, damit die Datei auf dem iPhone landet.
 
 [ ] Task 5.3 — End‑to‑End‑Test

@@ -27,6 +27,12 @@ Das System nutzt einen **Hybrid-Ansatz**: Eine Docker-Infrastruktur (n8n + Times
 
 > Portainer ist nur die Oberfläche für Docker. Die Container und Abhängigkeiten laufen weiterhin im Compose-Stack.
 
+### 🌐 Hinweis für GitHub Codespaces
+Wenn du in GitHub Codespaces entwickelst, funktioniert `localhost` für OAuth-Redirects (Polar, Withings) nicht.
+1. Setze die Ports `5678` (n8n) und `3000` (MCP) im Codespaces-Panel auf **Public**.
+2. Nutze die Codespaces-URLs (z.B. `https://<codespace>-5678.app.github.dev`) als Redirect URIs in den Developer-Portalen.
+3. Trage diese URLs auch in deine `.env` bei `WEBHOOK_URL` und `POLAR_REDIRECT_URI` ein.
+
 ## 🧠 n8n Workflow
 
 Importiere `workflows/athlete_sync_workflow.json` in dein n8n und richte die API-Zugangsdaten ein:
@@ -35,7 +41,11 @@ Importiere `workflows/athlete_sync_workflow.json` in dein n8n und richte die API
 - Intervals: `INTERVALS_API_TOKEN`
 - Habitica: `HABITICA_USER_ID` + `HABITICA_API_TOKEN`
 - Hevy: `HEVY_API_KEY`
-- Withings: OAuth2-Credentials
+- Withings: OAuth2-Credentials (via EU Medical Cloud)
+  * **Auth URL:** `https://account.withings.com/oauth2_user/authorize2`
+  * **Access Token URL:** `https://wbsapi.withings.net/v2/oauth2`
+  * **Scope:** `user.metrics`
+  * **Callback URL in Withings:** `<deine-n8n-url>/rest/oauth2-credential/callback`
 
 Danach kannst du den Workflow manuell testen oder täglich um 06:00 Uhr automatisch ausführen lassen.
 

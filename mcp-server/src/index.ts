@@ -105,9 +105,9 @@ app.get('/polar/auth', async (_, res) => {
   </div>
   
   <div class="step">
-    <span class="step-num">Step 2:</span> After authorization, Polar redirects to a URL you can't access.
+    <span class="step-num">Step 2:</span> After authorization, Polar redirects to your configured callback URL.
     <br>Look at the URL bar - copy the <strong>code</strong> parameter.<br>
-    <strong>Example:</strong> http://localhost:3000/polar/callback?<strong style="background: yellow;">code=abc123xyz</strong>
+    <strong>Example:</strong> ${process.env.POLAR_REDIRECT_URI || 'http://localhost:3000/polar/callback'}?<strong style="background: yellow;">code=abc123xyz</strong>
   </div>
   
   <div class="step">

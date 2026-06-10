@@ -1,0 +1,127 @@
+{
+  "name": "Daily AI Coach Newsletter",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      },
+      "name": "Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM view_athlete_weekly_trends ORDER BY week_start DESC LIMIT 1;"
+      },
+      "name": "Fetch DB Data",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "DEINE_CREDENTIAL_ID",
+          "name": "TimescaleDB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://ollama:11434/api/generate",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "gemma4:e4b-qat"
+            },
+            {
+              "name": "prompt",
+              "value": "={{ 'Du bist mein KI-Fitness-Coach. Erstelle mir einen kurzen täglichen Morgen-Bericht in sauberem Markdown (mit Emojis) basierend auf meinen letzten Datenbank-Werten. Hier sind die Daten: ' + JSON.stringify($json) }}"
+            },
+            {
+              "name": "stream",
+              "value": false
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Ollama LLM",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "dein.server@domain.de",
+        "toEmail": "deine.private@email.de",
+        "subject": "🚀 Dein Daily AI Coach Briefing",
+        "text": "={{ $json.response }}",
+        "options": {}
+      },
+      "name": "Send Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Schedule": {
+      "main": [
+        [
+          {
+            "node": "Fetch DB Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch DB Data": {
+      "main": [
+        [
+          {
+            "node": "Ollama LLM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama LLM": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {}
+}
