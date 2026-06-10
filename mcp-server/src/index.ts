@@ -5,6 +5,9 @@ import { Pool } from 'pg';
 import { exchangePolarCode, fetchPolarSleep, getPolarAuthUrl, refreshPolarToken } from './polar';
 import { CronometerError, fetchCronometerExport, fetchCronometerHealth, fetchCronometerDiagnostics } from './cronometer';
 import { IntervalsError, fetchIntervalsAthlete, fetchIntervalsFitness, fetchIntervalsActivities, exportIntervalsFitnessCsv, exportIntervalsActivitiesCsv } from './intervals';
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
+import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 
 dotenv.config();
 
@@ -57,6 +60,84 @@ app.get('/trends', async (_, res) => {
   } catch (error) {
     console.error('Query failed:', error);
     res.status(500).json({ error: 'query_failed' });
+  }
+});
+
+// ============================================================================
+// MCP SERVER SETUP (Model Context Protocol)
+// ============================================================================
+
+const mcpServer = new Server(
+  {
+    name: 'fitness-mcp',
+    version: '1.0.0',
+  },
+  {
+    capabilities: {
+      tools: {},
+    },
+  }
+);
+
+mcpServer.setRequestHandler(ListToolsRequestSchema, async () => {
+  return {
+    tools: [
+      {
+        name: 'get_fitness_trends',
+        description: 'Holt die aggregierten wöchentlichen Fitness-, Schlaf- und Gesundheitsdaten des Athleten aus der Datenbank.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            limit: {
+              type: 'number',
+              description: 'Anzahl der Wochen, die abgerufen werden sollen (Standard: 4)',
+            },
+          },
+        },
+      },
+    ],
+  };
+});
+
+mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
+  if (request.params.name === 'get_fitness_trends') {
+    const limit = (request.params.arguments?.limit as number) ?? 4;
+    try {
+      const result = await pool.query(
+        `SELECT * FROM view_athlete_weekly_trends ORDER BY week_start DESC LIMIT $1`,
+        [limit]
+      );
+
+      if (result.rows.length === 0) {
+        return { content: [{ type: 'text', text: 'Keine Daten in der Datenbank gefunden.' }] };
+      }
+
+      const headers = Object.keys(result.rows[0]).join(',');
+      const rows = result.rows.map((row) =>
+        Object.values(row).map((val) => (val === null ? '' : val)).join(',')
+      );
+      const csv = [headers, ...rows].join('\n');
+
+      return { content: [{ type: 'text', text: csv }] };
+    } catch (error: any) {
+      return { content: [{ type: 'text', text: `Datenbankfehler: ${error.message}` }], isError: true };
+    }
+  }
+  throw new Error(`Unknown tool: ${request.params.name}`);
+});
+
+let sseTransport: SSEServerTransport | null = null;
+
+app.get('/mcp/sse', async (req, res) => {
+  sseTransport = new SSEServerTransport('/mcp/messages', res);
+  await mcpServer.connect(sseTransport);
+});
+
+app.post('/mcp/messages', async (req, res) => {
+  if (sseTransport) {
+    await sseTransport.handlePostMessage(req, res);
+  } else {
+    res.status(400).send('SSE not initialized');
   }
 });
 

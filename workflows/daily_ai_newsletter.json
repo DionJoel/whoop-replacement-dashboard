@@ -23,7 +23,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT * FROM view_athlete_weekly_trends ORDER BY week_start DESC LIMIT 1;"
+        "query": "SELECT * FROM view_ai_daily_context ORDER BY day_date DESC LIMIT 3;"
       },
       "name": "Fetch DB Data",
       "type": "n8n-nodes-base.postgres",
@@ -52,7 +52,7 @@
             },
             {
               "name": "prompt",
-              "value": "={{ 'Du bist mein KI-Fitness-Coach. Erstelle mir einen kurzen täglichen Morgen-Bericht in sauberem Markdown (mit Emojis) basierend auf meinen letzten Datenbank-Werten. Hier sind die Daten: ' + JSON.stringify($json) }}"
+              "value": "={{ 'Du bist mein elitärer KI-Athletik-Coach. Schreibe mir mein heutiges Morgen-Briefing als kompakte E-Mail in Markdown (mit passenden Emojis). Analysiere meine Daten der letzten 3 Tage (Schlaf/HRV, Trainingsbelastung/Fatigue, Krafttraining-Volumen und Habitica-Tasks). Erkenne Trends und gib mir EINE konkrete Trainingsempfehlung für heute (z.B. \"Erholung\", \"Fokus auf Cardio\" oder \"Push dich\"). Erwähne keine technischen JSON-Keys, sondern formuliere es flüssig. Hier sind meine Rohdaten: ' + JSON.stringify($json) }}"
             },
             {
               "name": "stream",

@@ -113,3 +113,36 @@ SELECT
 FROM hevy_workouts
 GROUP BY week_start
 ORDER BY week_start DESC;
+
+-- Tägliche Aggregation für den täglichen KI-Morgen-Newsletter
+CREATE OR REPLACE VIEW view_ai_daily_context AS
+SELECT
+  coalesce(p.day_date, i.day_date, h.day_date, w.day_date, hab.day_date) AS day_date,
+  p.avg_hrv AS hrv_rmssd,
+  p.avg_sleep_score AS sleep_score,
+  i.avg_ctl AS fitness_ctl,
+  i.avg_atl AS fatigue_atl,
+  i.avg_tsb AS form_tsb,
+  h.total_volume_kg AS strength_volume_kg,
+  hab.completed_tasks,
+  w.avg_weight AS weight_kg
+FROM (
+  SELECT date_trunc('day', timestamp)::date AS day_date, avg(hrv_rmssd) AS avg_hrv, avg(sleep_score) AS avg_sleep_score
+  FROM polar_metrics GROUP BY 1
+) p
+FULL OUTER JOIN (
+  SELECT date_trunc('day', timestamp)::date AS day_date, avg(ctl) AS avg_ctl, avg(atl) AS avg_atl, avg(tsb) AS avg_tsb
+  FROM intervals_metrics GROUP BY 1
+) i ON p.day_date = i.day_date
+FULL OUTER JOIN (
+  SELECT date_trunc('day', timestamp)::date AS day_date, sum(volume_kg) AS total_volume_kg
+  FROM hevy_workouts GROUP BY 1
+) h ON coalesce(p.day_date, i.day_date) = h.day_date
+FULL OUTER JOIN (
+  SELECT date_trunc('day', timestamp)::date AS day_date, avg(weight_kg) AS avg_weight
+  FROM withings_metrics GROUP BY 1
+) w ON coalesce(p.day_date, i.day_date, h.day_date) = w.day_date
+FULL OUTER JOIN (
+  SELECT date_trunc('day', timestamp)::date AS day_date, count(*) FILTER (WHERE completed) AS completed_tasks
+  FROM habitica_events GROUP BY 1
+) hab ON coalesce(p.day_date, i.day_date, h.day_date, w.day_date) = hab.day_date;
