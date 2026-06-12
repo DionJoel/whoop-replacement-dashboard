@@ -1,23 +1,21 @@
 {
   "name": "whoop-replacement-mcp-server",
-  "version": "0.1.0",
+  "version": "1.0.0",
+  "description": "Minimaler MCP-Server für Fitness-Daten (Claude Desktop Integration)",
   "private": true,
+  "main": "dist/index.js",
   "scripts": {
-    "start": "ts-node src/index.ts",
     "build": "tsc",
-    "start:prod": "node dist/index.js"
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "clean": "rm -rf dist"
   },
   "dependencies": {
-    "cors": "^2.8.5",
+    "@modelcontextprotocol/sdk": "^0.5.0",
     "dotenv": "^16.3.1",
-    "express": "^4.18.2",
-    "pg": "^8.11.1",
-    "playwright-chromium": "^1.42.0",
-    "undici": "^5.19.0"
+    "pg": "^8.11.1"
   },
   "devDependencies": {
-    "@types/cors": "^2.8.17",
-    "@types/express": "^4.17.17",
     "@types/node": "^20.14.4",
     "@types/pg": "^8.6.8",
     "ts-node": "^10.9.1",

@@ -1,6 +1,25 @@
 version: '3.8'
 
+# --- Netzwerk-Konfiguration (isoliert für Sicherheit) ---
+networks:
+  app_network:
+    driver: bridge
+    internal: false  # Erlaubt Zugriff von Host (für Portainer/SSH), aber nicht von außen
+
+# --- Volumes für persistente Daten ---
+volumes:
+  timescaledb_data:
+    driver: local
+  n8n_data:
+    driver: local
+  ollama_data:
+    driver: local
+
+# --- Services ---
 services:
+  # ============================================
+  # TimescaleDB (PostgreSQL mit Timescale-Erweiterung)
+  # ============================================
   timescaledb:
     image: timescale/timescaledb:latest-pg15
     container_name: timescaledb
@@ -10,13 +29,33 @@ services:
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - POSTGRES_DB=${POSTGRES_DB:-whoop_dashboard}
+      - TIMESCALEDB_TELEMETRY=off  # Deaktiviert Telemetrie
     volumes:
       - timescaledb_data:/var/lib/postgresql/data
       - ./init-db:/docker-entrypoint-initdb.d
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"  # Nur lokal zugänglich!
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+          cpus: 2.0
+        reservations:
+          memory: 2G
+          cpus: 0.5
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-whoop_dashboard}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - app_network
 
+  # ============================================
+  # n8n (Workflow-Automation)
+  # ============================================
   n8n:
     image: docker.n8n.io/n8nio/n8n:latest
     container_name: n8n
@@ -24,64 +63,117 @@ services:
       - .env
     environment:
       - DB_TYPE=postgresdb
-      - DB_POSTGRESDB_HOST=${DB_HOST:-timescaledb}
+      - DB_POSTGRESDB_HOST=timescaledb
       - DB_POSTGRESDB_PORT=5432
       - DB_POSTGRESDB_DATABASE=${POSTGRES_DB}
       - DB_POSTGRESDB_USER=${POSTGRES_USER}
       - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
       - WEBHOOK_URL=${WEBHOOK_URL}
       - GENERIC_TIMEZONE=Europe/Berlin
+      - NODE_OPTIONS=--max-old-space-size=4096  # Erhöht Node.js Memory-Limit
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_USER:-admin}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD:-change_me}
+      - N8N_HOST=0.0.0.0
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=https
+      - N8N_HTTPS_CERT=/certs/fullchain.pem
+      - N8N_HTTPS_KEY=/certs/privkey.pem
     volumes:
       - n8n_data:/home/node/.n8n
+      - ./workflows:/home/node/.n8n/workflows  # Workflows persistieren
+      - ./certs:/certs:ro  # Optional: SSL-Zertifikate
     ports:
-      - "5678:5678"
+      - "127.0.0.1:5678:5678"  # Nur lokal zugänglich!
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: 1.5
+        reservations:
+          memory: 1G
+          cpus: 0.5
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5678/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     depends_on:
-      - timescaledb
+      timescaledb:
+        condition: service_healthy
+    networks:
+      - app_network
 
+  # ============================================
+  # Ollama (Lokale KI-Modelle)
+  # ============================================
   ollama:
     image: ollama/ollama:latest
     container_name: ollama
     volumes:
       - ollama_data:/root/.ollama
     ports:
-      - "11434:11434"
+      - "127.0.0.1:11434:11434"  # Nur lokal zugänglich!
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 10G  # Für mistral-7b-instruct:q4_0 (~6.5 GB) + Puffer
+          cpus: 3.0
+        reservations:
+          memory: 2G
+          cpus: 1.0
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s  # Ollama braucht länger zum Starten
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_ORIGINS=*
+    networks:
+      - app_network
 
+  # ============================================
+  # MCP-Server (Claude Desktop Integration)
+  # ============================================
   mcp-server:
-    image: node:20-alpine
+    build:
+      context: ./mcp-server
+      dockerfile: Dockerfile
     container_name: mcp-server
     working_dir: /app
-    volumes:
-      - ./mcp-server:/app
-    command: sh -c "npm install && npm start"
-    ports:
-      - "3000:3000"
     env_file:
       - .env
     environment:
-      - DB_HOST=${DB_HOST:-timescaledb}
+      - DB_HOST=timescaledb
       - DB_PORT=5432
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - MCP_SERVER_PORT=${MCP_SERVER_PORT:-3000}
-      - POLAR_CLIENT_ID
-      - POLAR_CLIENT_SECRET
-      - POLAR_REDIRECT_URI
-      - POLAR_SCOPE
-      - CRONOMETER_PROXY_URL
-      - CRONOMETER_USERNAME
-      - CRONOMETER_PASSWORD
-      - API_KEY
-      - INTERVALS_KEY
-      - ATHLETE_ID
-      - INTERVALS_API_BASE_URL
-    depends_on:
-      - timescaledb
+      - MCP_SERVER_PORT=3000
+      - NODE_ENV=production
+    volumes:
+      - ./mcp-server:/app
+    ports:
+      - "127.0.0.1:3000:3000"  # Nur lokal zugänglich!
     restart: unless-stopped
-
-volumes:
-  timescaledb_data:
-  n8n_data:
-  ollama_data:
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: 0.5
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    networks:
+      - app_network

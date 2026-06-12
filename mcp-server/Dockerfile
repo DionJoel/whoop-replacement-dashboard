@@ -1,32 +1,27 @@
-FROM node:20-bullseye-slim
+# Minimales Docker-Image für den MCP-Server
+FROM node:20-alpine
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates \
-    fonts-liberation \
-    libatk1.0-0 \
-    libatk-bridge2.0-0 \
-    libcups2 \
-    libdrm2 \
-    libgbm1 \
-    libgtk-3-0 \
-    libnspr4 \
-    libnss3 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxrandr2 \
-    libxss1 \
-    libxkbcommon0 \
-    libasound2 \
-    libpangocairo-1.0-0 \
-    libx11-xcb1 && \
-  rm -rf /var/lib/apt/lists/*
+# Arbeitsverzeichnis
+WORKDIR /app
 
-WORKDIR /usr/src/app
-
+# Abhängigkeiten installieren
 COPY package.json package-lock.json* ./
-RUN npm install
+RUN npm ci --only=production
 
+# Quellcode kopieren
 COPY . .
 
+# Build (falls nicht bereits gebuildet)
+RUN npm run build
+
+# Port freigeben
 EXPOSE 3000
+
+# Healthcheck
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3000/health', (res) => { \
+    if (res.statusCode !== 200) process.exit(1); \
+  }).on('error', () => process.exit(1))" || exit 1
+
+# Startbefehl
 CMD ["npm", "run", "start"]

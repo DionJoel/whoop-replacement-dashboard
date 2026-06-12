@@ -1,0 +1,564 @@
+{
+  "name": "Daily Fitness Data Pull & AI Analysis",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      },
+      "id": "cron-trigger",
+      "name": "Cron Trigger (9 Uhr)",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "http://ollama:11434/api/tags",
+        "authentication": "none",
+        "method": "GET",
+        "options": {
+          "retryOnFail": true,
+          "maxTries": 3,
+          "delayBetweenTries": 2000
+        }
+      },
+      "id": "check-ollama",
+      "name": "Check Ollama Health",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        450,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.status }}",
+              "operation": "notEqual",
+              "value2": "success"
+            }
+          ]
+        }
+      },
+      "id": "ollama-health-check",
+      "name": "Ollama Health Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        650,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "subject": "❌ Ollama nicht verfügbar",
+        "text": "Der Ollama-Server ist nicht erreichbar. Bitte prüfe den Container-Status.",
+        "toEmail": "={{ $env.SMTP_TO }}",
+        "fromEmail": "={{ $env.SMTP_FROM }}",
+        "smtpHost": "={{ $env.SMTP_HOST }}",
+        "smtpPort": "={{ $env.SMTP_PORT }}",
+        "smtpUser": "={{ $env.SMTP_USER }}",
+        "smtpPass": "={{ $env.SMTP_PASSWORD }}",
+        "smtpSecure": "={{ $env.SMTP_SECURE === 'true' }}"
+      },
+      "id": "send-ollama-error",
+      "name": "Send Ollama Error Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [
+        850,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "url": "http://timescaledb:5432",
+        "authentication": "none",
+        "method": "GET",
+        "options": {
+          "retryOnFail": true,
+          "maxTries": 3,
+          "delayBetweenTries": 2000
+        }
+      },
+      "id": "check-db",
+      "name": "Check DB Health",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        450,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.status }}",
+              "operation": "notEqual",
+              "value2": "200"
+            }
+          ]
+        }
+      },
+      "id": "db-health-check",
+      "name": "DB Health Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        650,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "subject": "❌ Datenbank nicht verfügbar",
+        "text": "Die TimescaleDB ist nicht erreichbar. Bitte prüfe den Container-Status.",
+        "toEmail": "={{ $env.SMTP_TO }}",
+        "fromEmail": "={{ $env.SMTP_FROM }}",
+        "smtpHost": "={{ $env.SMTP_HOST }}",
+        "smtpPort": "={{ $env.SMTP_PORT }}",
+        "smtpUser": "={{ $env.SMTP_USER }}",
+        "smtpPass": "={{ $env.SMTP_PASSWORD }}",
+        "smtpSecure": "={{ $env.SMTP_SECURE === 'true' }}"
+      },
+      "id": "send-db-error",
+      "name": "Send DB Error Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [
+        850,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "credentials": {
+          "postgres": {
+            "id": "timescaledb-creds",
+            "name": "TimescaleDB Credentials"
+          }
+        },
+        "query": "SELECT * FROM view_ai_daily_context WHERE day_date = CURRENT_DATE - INTERVAL '1 day' ORDER BY day_date DESC LIMIT 1;"
+      },
+      "id": "get-daily-context",
+      "name": "Get Daily Context",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        1050,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.length }}",
+              "operation": "less",
+              "value2": 1
+            }
+          ]
+        }
+      },
+      "id": "check-daily-data",
+      "name": "Check Daily Data",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "http://ollama:11434/api/generate",
+        "authentication": "none",
+        "method": "POST",
+        "body": {
+          "model": "={{ $env.OLLAMA_MODEL }}",
+          "prompt": "={{ $node[\"Generate AI Prompt\"].json[\"prompt\"] }}",
+          "stream": false,
+          "options": {
+            "temperature": 0.7,
+            "top_p": 0.9
+          }
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "options": {
+          "retryOnFail": true,
+          "maxTries": 3,
+          "delayBetweenTries": 5000,
+          "timeout": 60000
+        }
+      },
+      "id": "call-ollama",
+      "name": "Call Ollama API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1450,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Generiere den Prompt für die KI
+const dailyData = items[0]?.json[0];
+
+if (!dailyData) {
+  return [{ json: { prompt: 'Keine Daten für heute verfügbar.' } }];
+}
+
+// Formatiere die Daten für den Prompt
+const formattedData = {
+  datum: dailyData.day_date,
+  hrv: dailyData.hrv_rmssd || '-',
+  ruhepuls: dailyData.resting_heart_rate || '-',
+  schlaf_score: dailyData.sleep_score || '-',
+  cardio_load: dailyData.cardio_load || '-',
+  recovery_score: dailyData.recovery_score || '-',
+  fitness_ctl: dailyData.fitness_ctl || '-',
+  fatigue_atl: dailyData.fatigue_atl || '-',
+  form_tsb: dailyData.form_tsb || '-',
+  strength_volume: dailyData.strength_volume_kg || '-',
+  strength_reps: dailyData.strength_reps || '-',
+  strength_rpe: dailyData.strength_rpe || '-',
+  gewicht: dailyData.weight_kg || '-',
+  koerperfett: dailyData.body_fat_percent || '-',
+  muskelmasse: dailyData.muscle_mass_kg || '-',
+  hydration: dailyData.hydration_percent || '-',
+  completed_tasks: dailyData.completed_tasks || '-',
+  total_tasks: dailyData.total_tasks || '-',
+  completion_rate: dailyData.completion_rate || '-'
+};
+
+// System-Prompt für den KI-Coach
+const systemPrompt = `
+Du bist ein erfahrener Athletik-Coach und Analyst. Analysiere die folgenden Daten und erstelle eine 
+**kompakte, strukturierte Zusammenfassung** mit:
+
+1. **Aktueller Status** (1-2 Sätze)
+2. **Schlaf & Regeneration** (HRV, Ruhepuls, Schlaf-Score)
+3. **Trainingsbelastung** (CTL/ATL/TSB, Cardio-Load, Krafttrainings-Volumen)
+4. **Körperliche Verfassung** (Gewicht, Körperfett, Muskelmasse, Hydration)
+5. **Habitica-Statistik** (Produktivität)
+6. **Empfehlungen für heute** (max. 3 konkrete Punkte)
+
+**Wichtig:**
+- Antworte **ausschließlich in Markdown** (kein Plaintext!)
+- Nutze **Überschriften** (##, ###) und **Aufzählungen** für Struktur
+- Sei **präzise und knapp** (max. 200 Wörter)
+- Verwende **keine** Emojis oder Smalltalk
+- Basierend auf den Daten:
+${JSON.stringify(formattedData, null, 2)}
+`;
+
+return [{ json: { prompt: systemPrompt } }];"
+      },
+      "id": "generate-ai-prompt",
+      "name": "Generate AI Prompt",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1250,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Extrahiere die KI-Antwort aus dem Ollama-Response
+const response = items[0]?.json;
+
+if (!response || !response.response) {
+  return [{ json: { markdown: 'Keine Antwort von der KI erhalten.' } }];
+}
+
+// Die Antwort ist in response.response
+const aiResponse = response.response;
+
+// Erstelle das finale Markdown-Dokument
+const finalMarkdown = `# Athletik Dashboard - ${new Date().toLocaleDateString('de-DE')}
+
+${aiResponse}
+
+---
+*Generiert am: ${new Date().toLocaleString('de-DE')}*
+*Modell: ${response.model || 'Unbekannt'}*
+`;
+
+return [{ json: { markdown: finalMarkdown, filename: `00_Athletik_Dashboard_${new Date().toISOString().split('T')[0]}.md` } }];"
+      },
+      "id": "format-ai-response",
+      "name": "Format AI Response",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1650,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "filePath": "={{ $env.OBSIDIAN_VAULT_PATH || '/obsidian-vault' }}",
+        "fileName": "={{ $node[\"Format AI Response\"].json[\"filename\"] }}",
+        "binaryPropertyName": "markdown",
+        "options": {
+          "encoding": "utf8"
+        }
+      },
+      "id": "save-to-obsidian",
+      "name": "Save to Obsidian",
+      "type": "n8n-nodes-base.writeBinaryFile",
+      "typeVersion": 2,
+      "position": [
+        1850,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "subject": "✅ Tägliches Athletik Dashboard generiert",
+        "text": "Das tägliche Athletik Dashboard wurde erfolgreich generiert und in Obsidian gespeichert.",
+        "toEmail": "={{ $env.SMTP_TO }}",
+        "fromEmail": "={{ $env.SMTP_FROM }}",
+        "smtpHost": "={{ $env.SMTP_HOST }}",
+        "smtpPort": "={{ $env.SMTP_PORT }}",
+        "smtpUser": "={{ $env.SMTP_USER }}",
+        "smtpPass": "={{ $env.SMTP_PASSWORD }}",
+        "smtpSecure": "={{ $env.SMTP_SECURE === 'true' }}"
+      },
+      "id": "send-success-email",
+      "name": "Send Success Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [
+        2050,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Logge den Erfolg
+console.log('✅ Workflow erfolgreich abgeschlossen:');
+console.log('- Daten aus der DB abgerufen');
+console.log('- KI-Analyse generiert');
+console.log('- Ergebnis in Obsidian gespeichert');
+console.log('- Benachrichtigungs-E-Mail gesendet');
+
+return items;"
+      },
+      "id": "log-success",
+      "name": "Log Success",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        2250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "subject": "⚠️ Keine Daten für heute verfügbar",
+        "text": "Es wurden keine Daten für heute in der Datenbank gefunden. Bitte prüfe die API-Integration.",
+        "toEmail": "={{ $env.SMTP_TO }}",
+        "fromEmail": "={{ $env.SMTP_FROM }}",
+        "smtpHost": "={{ $env.SMTP_HOST }}",
+        "smtpPort": "={{ $env.SMTP_PORT }}",
+        "smtpUser": "={{ $env.SMTP_USER }}",
+        "smtpPass": "={{ $env.SMTP_PASSWORD }}",
+        "smtpSecure": "={{ $env.SMTP_SECURE === 'true' }}"
+      },
+      "id": "send-no-data-email",
+      "name": "Send No Data Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [
+        1450,
+        500
+      ]
+    }
+  ],
+  "connections": {
+    "cron-trigger": {
+      "main": [
+        [
+          {
+            "node": "check-ollama",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-ollama": {
+      "main": [
+        [
+          {
+            "node": "ollama-health-check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ollama-health-check": {
+      "main": [
+        [
+          {
+            "node": "send-ollama-error",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "check-db",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-db": {
+      "main": [
+        [
+          {
+            "node": "db-health-check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "db-health-check": {
+      "main": [
+        [
+          {
+            "node": "send-db-error",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "get-daily-context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get-daily-context": {
+      "main": [
+        [
+          {
+            "node": "check-daily-data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-daily-data": {
+      "main": [
+        [
+          {
+            "node": "send-no-data-email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "generate-ai-prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "generate-ai-prompt": {
+      "main": [
+        [
+          {
+            "node": "call-ollama",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "call-ollama": {
+      "main": [
+        [
+          {
+            "node": "format-ai-response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "format-ai-response": {
+      "main": [
+        [
+          {
+            "node": "save-to-obsidian",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "save-to-obsidian": {
+      "main": [
+        [
+          {
+            "node": "send-success-email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send-success-email": {
+      "main": [
+        [
+          {
+            "node": "log-success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "1.0.0",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}
