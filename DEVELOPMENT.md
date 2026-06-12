@@ -112,3 +112,89 @@ Ziel: Das System agiert vollautark. n8n triggert die lokale LLM im Hintergrund, 
 
 [ ] Task 5.3 — End‑to‑End‑Test
 * Cronjob manuell auslösen. Prüfen, ob nach ca. 20–30 Sekunden Rechenzeit auf der CPU des Fujitsu ein perfekt formatiertes Dashboard in Obsidian auf dem iPhone bereitsteht.
+
+---
+
+## 🖥️ Hardware-Spezifikationen (Fujitsu Mini‑PC)
+
+| Komponente | Spezifikation | Verwendung | Status |
+|------------|--------------|------------|--------|
+| **CPU** | Intel i7-6700T (4C/8T, 2.8–3.6 GHz) | Primärer Deployment-Server | **Ab 13.06.2026** |
+| **CPU (aktuell)** | Intel i3-6100T (2C/4T, 2.3 GHz) | temporär | Bis 12.06.2026 |
+| **RAM** | 32 GB DDR4 | Ausreichend für: TimescaleDB + Ollama (`mistral-7b-instruct:q4_0`) + n8n | ✅ |
+| **Speicher** | SSD (Größe zu prüfen) | Docker-Volumes (`ollama_data/`, TimescaleDB) | ⚠️ |
+| **Netzwerk** | Gigabit Ethernet | Verbindung zu APIs und lokalem Netzwerk | ✅ |
+| **Betriebssystem** | Linux (Ubuntu/Debian empfohlen) | Docker-Host | ✅ |
+
+**Hinweise:**
+- Der **i7-6700T** unterstützt **keine AVX-512**, aber `mistral-7b-instruct:q4_0` läuft stabil auf CPU (ca. 10–15 Tokens/s).
+- **32 GB RAM** ermöglichen gleichzeitiges Laden von TimescaleDB + Ollama + n8n.
+- **Empfohlenes Modell:** `mistral-7b-instruct:q4_0` (ca. 6.5 GB RAM) oder `gemma4:e4b-qat` (ca. 8 GB RAM).
+- **Vor Deploy:** Modell vorladen mit `ollama pull mistral-7b-instruct:q4_0`.
+
+---
+
+## ✅ Pre‑Deployment Checkliste
+
+### 🔧 **Workflow‑Anpassungen (n8n)**
+* **Pflicht für Stabilität:**
+  - [ ] **Fehlerbehandlung & Retries** für alle API-Calls (PostgreSQL, Ollama, Email) einbauen:
+    ```json
+    "options": { "retryOnFail": true, "maxTries": 3, "delayBetweenTries": 2000 }
+    ```
+  - [ ] **Error‑Handling** mit **E‑Mail‑Benachrichtigung** nach jedem Node:
+    - If-Node prüft auf `$json.error` → Send Email an `deine.private@email.de`.
+  - [ ] **Environment Variables** für Ollama-URL nutzen:
+    ```json
+    "url": "={{ $env.OLLAMA_URL || 'http://ollama:11434' }}/api/generate"
+    ```
+  - [ ] **Datenvalidierung** nach DB-Query:
+    - Function-Node prüft auf leere Ergebnisse (`if (!items[0]?.json?.length)`).
+  - [ ] **Modell wechseln** zu `mistral-7b-instruct:q4_0` (besser als `gemma4:e4b-qat` für deine Hardware).
+  - [ ] **Timeout für Ollama** auf 60.000 ms setzen (Cold-Start-Puffer).
+  - [ ] **Manual Trigger** für Tests hinzufügen (parallel zum Schedule-Node).
+  - [ ] **Logging-Node** am Ende einfügen:
+    ```javascript
+    console.log(JSON.stringify({ timestamp: new Date(), status: 'success', model: $json.model }));
+    ```
+
+### 🐳 **Infrastruktur (Docker/Portainer)**
+- [ ] **Docker‑Compose prüfen:**
+  - `ollama` und `n8n` müssen im **gleichen Docker‑Netzwerk** sein (z. B. `networks: [app_network]`).
+  - Ports freigeben:
+    - Ollama: `11434:11434` (nur lokal oder im internen Netzwerk!).
+    - TimescaleDB: `5432:5432` (nur für n8n erreichbar).
+- [ ] **Credentials in n8n anlegen:**
+  - [ ] Postgres (TimescaleDB): Host, Port, DB-Name, User, Passwort.
+  - [ ] Email-SMTP: Server, Port, TLS, User, Passwort.
+- [ ] **Ollama‑Modell vorladen:**
+  ```bash
+  docker exec -it ollama ollama pull mistral-7b-instruct:q4_0
+  ```
+- [ ] **.env‑Datei auf Fujitsu anpassen:**
+  ```bash
+  OLLAMA_URL=http://localhost:11434
+  DATABASE_URL=postgresql://user:pass@timescaledb:5432/db_name
+  ```
+
+### 🧪 **Tests & Monitoring**
+- [ ] **Workflow in Codespace testen:**
+  - Manual Trigger nutzen und Ausgabe prüfen.
+  - Mit `n8n execute --workflow=./workflows/daily_ai_newsletter.json` testen (falls CLI verfügbar).
+- [ ] **Erste Ausführung auf Fujitsu monitoren:**
+  ```bash
+  docker logs -f n8n
+  docker logs -f ollama
+  ```
+- [ ] **Datenbank‑View prüfen:**
+  ```sql
+  SELECT * FROM view_ai_daily_context ORDER BY day_date DESC LIMIT 3;
+  ```
+  → Muss **valide Daten** der letzten 3 Tage zurückgeben.
+
+---
+
+**📌 Wichtig:**
+- **Sicherheit:** Ollama **nie** öffentlich exponieren! Nur im internen Netzwerk oder per `127.0.0.1` zugänglich machen.
+- **Backup:** Vor Deploy TimescaleDB sichern (`pg_dump`).
+- **Hardware‑Check:** Mit `htop` prüfen, ob genug RAM/CPU während des ersten Laufs frei bleibt.

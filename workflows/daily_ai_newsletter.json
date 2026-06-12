@@ -37,7 +37,31 @@
           "id": "DEINE_CREDENTIAL_ID",
           "name": "TimescaleDB"
         }
+      },
+      "options": {
+        "retryOnFail": true,
+        "maxTries": 3,
+        "delayBetweenTries": 2000
       }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ JSON.stringify($json.error) }}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "name": "Check DB Error",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        440,
+        0
+      ]
     },
     {
       "parameters": {
@@ -52,7 +76,7 @@
             },
             {
               "name": "prompt",
-              "value": "={{ 'Du bist mein elitärer KI-Athletik-Coach. Schreibe mir mein heutiges Morgen-Briefing als kompakte E-Mail in Markdown (mit passenden Emojis). Analysiere meine Daten der letzten 3 Tage (Schlaf/HRV, Trainingsbelastung/Fatigue, Krafttraining-Volumen und Habitica-Tasks). Erkenne Trends und gib mir EINE konkrete Trainingsempfehlung für heute (z.B. \"Erholung\", \"Fokus auf Cardio\" oder \"Push dich\"). Erwähne keine technischen JSON-Keys, sondern formuliere es flüssig. Hier sind meine Rohdaten: ' + JSON.stringify($json) }}"
+              "value": "={{ 'Du bist mein elitärer KI-Athletik-Coach. Schreibe mir mein heutiges Morgen-Briefing als kompakte E-Mail in Markdown (mit passenden Emojis). Analysiere meine Daten der letzten 3 Tage (Schlaf/HRV, Trainingsbelastung/Fatigue, Krafttraining-Volumen und Habitica-Tasks). Erkenne Trends und gib mir EINE konkrete Trainingsempfehlung für heute (z.B. \"Erholung\", \"Fokus auf Cardio\" oder \"Push dich\"). Erwähnne keine technischen JSON-Keys, sondern formuliere es flüssig. Hier sind meine Rohdaten: ' + JSON.stringify($json) }}"
             },
             {
               "name": "stream",
@@ -60,13 +84,47 @@
             }
           ]
         },
-        "options": {}
+        "options": {
+          "retryOnFail": true,
+          "maxTries": 2,
+          "delayBetweenTries": 5000,
+          "timeout": 60000
+        }
       },
       "name": "Ollama LLM",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [
-        440,
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-error",
+              "leftValue": "={{ $json.error }}",
+              "rightValue": "",
+              "operator": {
+                "type": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "name": "Check Ollama Error",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        880,
         0
       ]
     },
@@ -76,15 +134,73 @@
         "toEmail": "deine.private@email.de",
         "subject": "🚀 Dein Daily AI Coach Briefing",
         "text": "={{ $json.response }}",
-        "options": {}
+        "options": {
+          "retryOnFail": true,
+          "maxTries": 3,
+          "delayBetweenTries": 5000
+        }
       },
       "name": "Send Email",
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2,
       "position": [
-        660,
+        1100,
         0
       ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-email-error",
+              "leftValue": "={{ $json.error }}",
+              "rightValue": "",
+              "operator": {
+                "type": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "name": "Check Email Error",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "dein.server@domain.de",
+        "toEmail": "deine.private@email.de",
+        "subject": "🚨 FEHLER: Daily AI Coach Workflow",
+        "text": "**FEHLER im Daily AI Coach Workflow!**\n\nNode: {{ $node.name }}\nFehler: {{ $json.error || $json.message || 'Unbekannter Fehler' }}\nZeit: {{ new Date().toISOString() }}\nDaten: {{ JSON.stringify($json).substring(0, 500) }}",
+        "options": {
+          "retryOnFail": true,
+          "maxTries": 3
+        }
+      },
+      "name": "Send Error Notification",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        200
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "DEINE_CREDENTIAL_ID",
+          "name": "Email-SMTP"
+        }
+      }
     }
   ],
   "connections": {
@@ -103,7 +219,23 @@
       "main": [
         [
           {
+            "node": "Check DB Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check DB Error": {
+      "main": [
+        [
+          {
             "node": "Ollama LLM",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send Error Notification",
             "type": "main",
             "index": 0
           }
@@ -114,7 +246,45 @@
       "main": [
         [
           {
+            "node": "Check Ollama Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Ollama Error": {
+      "main": [
+        [
+          {
             "node": "Send Email",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send Error Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email": {
+      "main": [
+        [
+          {
+            "node": "Check Email Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Email Error": {
+      "main": [
+        [
+          {
+            "node": "Send Error Notification",
             "type": "main",
             "index": 0
           }
