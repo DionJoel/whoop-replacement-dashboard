@@ -72,7 +72,7 @@
           "parameters": [
             {
               "name": "model",
-              "value": "gemma4:e4b-qat"
+              "value": "mistral-7b-instruct:q4_0"
             },
             {
               "name": "prompt",
@@ -130,18 +130,16 @@
     },
     {
       "parameters": {
-        "fromEmail": "dein.server@domain.de",
-        "toEmail": "deine.private@email.de",
-        "subject": "🚀 Dein Daily AI Coach Briefing",
-        "text": "={{ $json.response }}",
+        "webhookUrl": "={{ $env.DISCORD_WEBHOOK_URL }}",
+        "text": "🚀 **Dein Daily AI Coach Briefing**\n\n{{ $json.response }}",
         "options": {
           "retryOnFail": true,
           "maxTries": 3,
           "delayBetweenTries": 5000
         }
       },
-      "name": "Send Email",
-      "type": "n8n-nodes-base.emailSend",
+      "name": "Send Discord Report",
+      "type": "n8n-nodes-base.discord",
       "typeVersion": 2,
       "position": [
         1100,
@@ -158,7 +156,7 @@
           },
           "conditions": [
             {
-              "id": "has-email-error",
+              "id": "has-discord-error",
               "leftValue": "={{ $json.error }}",
               "rightValue": "",
               "operator": {
@@ -169,7 +167,7 @@
           "combinator": "and"
         }
       },
-      "name": "Check Email Error",
+      "name": "Check Discord Report Error",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
@@ -179,28 +177,20 @@
     },
     {
       "parameters": {
-        "fromEmail": "dein.server@domain.de",
-        "toEmail": "deine.private@email.de",
-        "subject": "🚨 FEHLER: Daily AI Coach Workflow",
-        "text": "**FEHLER im Daily AI Coach Workflow!**\n\nNode: {{ $node.name }}\nFehler: {{ $json.error || $json.message || 'Unbekannter Fehler' }}\nZeit: {{ new Date().toISOString() }}\nDaten: {{ JSON.stringify($json).substring(0, 500) }}",
+        "webhookUrl": "={{ $env.DISCORD_WEBHOOK_URL }}",
+        "text": "🚨 **FEHLER im Daily AI Coach Workflow!**\n\nNode: {{ $node.name }}\nFehler: {{ $json.error || $json.message || 'Unbekannter Fehler' }}\nZeit: {{ new Date().toISOString() }}\nDaten: {{ JSON.stringify($json).substring(0, 500) }}",
         "options": {
           "retryOnFail": true,
           "maxTries": 3
         }
       },
-      "name": "Send Error Notification",
-      "type": "n8n-nodes-base.emailSend",
+      "name": "Send Discord Error",
+      "type": "n8n-nodes-base.discord",
       "typeVersion": 2,
       "position": [
         1100,
         200
-      ],
-      "credentials": {
-        "smtp": {
-          "id": "DEINE_CREDENTIAL_ID",
-          "name": "Email-SMTP"
-        }
-      }
+      ]
     }
   ],
   "connections": {
@@ -235,7 +225,7 @@
             "index": 0
           },
           {
-            "node": "Send Error Notification",
+            "node": "Send Discord Error",
             "type": "main",
             "index": 0
           }
@@ -257,34 +247,34 @@
       "main": [
         [
           {
-            "node": "Send Email",
+            "node": "Send Discord Report",
             "type": "main",
             "index": 0
           },
           {
-            "node": "Send Error Notification",
+            "node": "Send Discord Error",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Send Email": {
+    "Send Discord Report": {
       "main": [
         [
           {
-            "node": "Check Email Error",
+            "node": "Check Discord Report Error",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Check Email Error": {
+    "Check Discord Report Error": {
       "main": [
         [
           {
-            "node": "Send Error Notification",
+            "node": "Send Discord Error",
             "type": "main",
             "index": 0
           }

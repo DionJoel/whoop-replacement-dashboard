@@ -138,7 +138,139 @@ services:
       - app_network
 
   # ============================================
-  # MCP-Server (Claude Desktop Integration)
+  # MCP-Server (Fitness-Datenquellen)
+  # ============================================
+  # Polar-MCP: https://github.com/NelsonNew/polar-mcp-server
+  polar-mcp:
+    build:
+      context: ./mcp-servers/polar-mcp-server
+      dockerfile: Dockerfile
+    container_name: polar-mcp
+    ports:
+      - "127.0.0.1:3000:3000"  # Nur lokal zugänglich!
+    environment:
+      - POLAR_CLIENT_ID=${POLAR_CLIENT_ID}
+      - POLAR_CLIENT_SECRET=${POLAR_CLIENT_SECRET}
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: 0.5
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/mcp"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - app_net
+
+  # Intervals-MCP: https://github.com/mvilanova/intervals-mcp-server
+  intervals-mcp:
+    build:
+      context: ./mcp-servers/intervals-mcp-server
+      dockerfile: Dockerfile
+    container_name: intervals-mcp
+    ports:
+      - "127.0.0.1:3001:3001"
+    environment:
+      - INTERVALS_KEY=${INTERVALS_KEY}
+      - ATHLETE_ID=${ATHLETE_ID}
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: 0.5
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/mcp"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - app_net
+
+  # Hevy-MCP: https://github.com/chrisdoc/hevy-mcp
+  hevy-mcp:
+    build:
+      context: ./mcp-servers/hevy-mcp
+      dockerfile: Dockerfile
+    container_name: hevy-mcp
+    ports:
+      - "127.0.0.1:3002:3002"
+    environment:
+      - HEVY_API_KEY=${HEVY_API_KEY}
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: 0.5
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3002/mcp"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - app_net
+
+  # Garmin-MCP: https://github.com/Taxuspt/garmin_mcp (für Fenix 6 Pro Sapphire)
+  garmin-mcp:
+    build:
+      context: ./mcp-servers/garmin_mcp
+      dockerfile: Dockerfile
+    container_name: garmin-mcp
+    ports:
+      - "127.0.0.1:3003:3003"
+    environment:
+      - GARMIN_CLIENT_ID=${GARMIN_CLIENT_ID}
+      - GARMIN_CLIENT_SECRET=${GARMIN_CLIENT_SECRET}
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: 0.5
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3003/mcp"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - app_net
+
+  # Cronometer-MCP: https://github.com/modelcontextprotocol/servers/tree/main/src/cronometer
+  cronometer-mcp:
+    build:
+      context: ./mcp-servers/cronometer-api-mcp
+      dockerfile: Dockerfile
+    container_name: cronometer-mcp
+    ports:
+      - "127.0.0.1:3004:3004"
+    environment:
+      - CRONOMETER_USERNAME=${CRONOMETER_USERNAME}
+      - CRONOMETER_PASSWORD=${CRONOMETER_PASSWORD}
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: 0.5
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3004/mcp"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - app_net
+
+  # ============================================
+  # Lokaler MCP-Server (TimescaleDB-Tools für Claude)
   # ============================================
   mcp-server:
     build:
@@ -154,12 +286,12 @@ services:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - MCP_SERVER_PORT=3000
+      - MCP_SERVER_PORT=8000
       - NODE_ENV=production
     volumes:
       - ./mcp-server:/app
     ports:
-      - "127.0.0.1:3000:3000"  # Nur lokal zugänglich!
+      - "127.0.0.1:8000:8000"  # Nur lokal zugänglich!
     restart: unless-stopped
     deploy:
       resources:
@@ -167,7 +299,7 @@ services:
           memory: 1G
           cpus: 0.5
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3

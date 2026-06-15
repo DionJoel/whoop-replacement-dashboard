@@ -167,6 +167,11 @@ timescaledb_data/
 n8n_data/
 ollama_data/
 
+# MCP-Server Builds und Dependencies
+mcp-servers/*/node_modules/
+mcp-servers/*/dist/
+mcp-servers/*/build/
+
 # Spyder project settings
 .spyderproject
 .spyproject
