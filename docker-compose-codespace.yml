@@ -1,0 +1,227 @@
+# Docker-Compose für GitHub Codespace (OHNE Ollama - für MCP-Server-Tests)
+# Verwende diese Datei NUR in Codespace, um die MCP-Server zu testen.
+# Auf dem Fujitsu: Nutze die Haupt- docker-compose.yml mit allen Services.
+
+version: '3.8'
+
+# Netzwerk
+networks:
+  app_network:
+    driver: bridge
+    internal: false
+
+# Volumes
+volumes:
+  timescaledb_data:
+    driver: local
+  n8n_data:
+    driver: local
+
+services:
+  # ============================================
+  # TimescaleDB (für Tests in Codespace)
+  # ============================================
+  timescaledb:
+    image: timescale/timescaledb:latest-pg15
+    container_name: timescaledb
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-athlete_metrics}
+      - TIMESCALEDB_TELEMETRY=off
+    volumes:
+      - timescaledb_data:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"  # In Codespace: Port 5432 freigeben
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: 1.0
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-athlete_metrics}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - app_network
+
+  # ============================================
+  # n8n (für Workflow-Tests)
+  # ============================================
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    container_name: n8n
+    env_file:
+      - .env
+    environment:
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=timescaledb
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=${POSTGRES_DB}
+      - DB_POSTGRESDB_USER=${POSTGRES_USER}
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
+      - GENERIC_TIMEZONE=Europe/Berlin
+      - NODE_OPTIONS=--max-old-space-size=2048
+      - N8N_BASIC_AUTH_ACTIVE=false  # In Codespace: Kein Auth für einfachen Test
+      - N8N_HOST=0.0.0.0
+      - N8N_PORT=5678
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./workflows:/home/node/.n8n/workflows
+    ports:
+      - "5678:5678"  # n8n Web-UI
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: 1.0
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5678/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    networks:
+      - app_network
+
+  # ============================================
+  # MCP-Server (für Tests in Codespace)
+  # ============================================
+  # Polar-MCP
+  polar-mcp:
+    build:
+      context: ./mcp-servers/polar-mcp-server
+      dockerfile: Dockerfile
+    container_name: polar-mcp
+    ports:
+      - "3000:3000"
+    environment:
+      - POLAR_CLIENT_ID=${POLAR_CLIENT_ID}
+      - POLAR_CLIENT_SECRET=${POLAR_CLIENT_SECRET}
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: 0.5
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/mcp"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - app_network
+
+  # Intervals-MCP
+  intervals-mcp:
+    build:
+      context: ./mcp-servers/intervals-mcp-server
+      dockerfile: Dockerfile
+    container_name: intervals-mcp
+    ports:
+      - "3001:3001"
+    environment:
+      - INTERVALS_KEY=${INTERVALS_KEY}
+      - ATHLETE_ID=${ATHLETE_ID}
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: 0.5
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/mcp"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - app_network
+
+  # Hevy-MCP
+  hevy-mcp:
+    build:
+      context: ./mcp-servers/hevy-mcp
+      dockerfile: Dockerfile
+    container_name: hevy-mcp
+    ports:
+      - "3002:3002"
+    environment:
+      - HEVY_API_KEY=${HEVY_API_KEY}
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: 0.5
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3002/mcp"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - app_network
+
+  # Garmin-MCP (für Fenix 6 Pro Sapphire)
+  garmin-mcp:
+    build:
+      context: ./mcp-servers/garmin_mcp
+      dockerfile: Dockerfile
+    container_name: garmin-mcp
+    ports:
+      - "3003:3003"
+    environment:
+      - GARMIN_CLIENT_ID=${GARMIN_CLIENT_ID}
+      - GARMIN_CLIENT_SECRET=${GARMIN_CLIENT_SECRET}
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: 0.5
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3003/mcp"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - app_network
+
+  # Cronometer-MCP
+  cronometer-mcp:
+    build:
+      context: ./mcp-servers/cronometer-api-mcp
+      dockerfile: Dockerfile
+    container_name: cronometer-mcp
+    ports:
+      - "3004:3004"
+    environment:
+      - CRONOMETER_USERNAME=${CRONOMETER_USERNAME}
+      - CRONOMETER_PASSWORD=${CRONOMETER_PASSWORD}
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: 0.5
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3004/mcp"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - app_network

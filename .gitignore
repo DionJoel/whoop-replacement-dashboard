@@ -171,6 +171,8 @@ ollama_data/
 mcp-servers/*/node_modules/
 mcp-servers/*/dist/
 mcp-servers/*/build/
+mcp-servers/*/.env
+mcp-servers/*/.git
 
 # Spyder project settings
 .spyderproject
