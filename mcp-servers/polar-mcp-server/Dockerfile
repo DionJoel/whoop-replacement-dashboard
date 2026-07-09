@@ -1,18 +1,18 @@
 # Polar MCP Server Dockerfile
-FROM node:18-alpine
+FROM node:20-alpine
 
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm install
+# Install dependencies (skip prepare script since source files are not copied yet)
+RUN npm install --ignore-scripts
 
 # Copy source code
 COPY . .
 
-# Build if needed
+# Build
 RUN npm run build
 
 EXPOSE 3000
