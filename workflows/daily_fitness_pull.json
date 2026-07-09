@@ -207,58 +207,7 @@
     },
     {
       "parameters": {
-        "functionCode": "// Generiere den Prompt für die KI
-const dailyData = items[0]?.json[0];
-
-if (!dailyData) {
-  return [{ json: { prompt: 'Keine Daten für heute verfügbar.' } }];
-}
-
-// Formatiere die Daten für den Prompt
-const formattedData = {
-  datum: dailyData.day_date,
-  hrv: dailyData.hrv_rmssd || '-',
-  ruhepuls: dailyData.resting_heart_rate || '-',
-  schlaf_score: dailyData.sleep_score || '-',
-  cardio_load: dailyData.cardio_load || '-',
-  recovery_score: dailyData.recovery_score || '-',
-  fitness_ctl: dailyData.fitness_ctl || '-',
-  fatigue_atl: dailyData.fatigue_atl || '-',
-  form_tsb: dailyData.form_tsb || '-',
-  strength_volume: dailyData.strength_volume_kg || '-',
-  strength_reps: dailyData.strength_reps || '-',
-  strength_rpe: dailyData.strength_rpe || '-',
-  gewicht: dailyData.weight_kg || '-',
-  koerperfett: dailyData.body_fat_percent || '-',
-  muskelmasse: dailyData.muscle_mass_kg || '-',
-  hydration: dailyData.hydration_percent || '-',
-  completed_tasks: dailyData.completed_tasks || '-',
-  total_tasks: dailyData.total_tasks || '-',
-  completion_rate: dailyData.completion_rate || '-'
-};
-
-// System-Prompt für den KI-Coach
-const systemPrompt = `
-Du bist ein erfahrener Athletik-Coach und Analyst. Analysiere die folgenden Daten und erstelle eine 
-**kompakte, strukturierte Zusammenfassung** mit:
-
-1. **Aktueller Status** (1-2 Sätze)
-2. **Schlaf & Regeneration** (HRV, Ruhepuls, Schlaf-Score)
-3. **Trainingsbelastung** (CTL/ATL/TSB, Cardio-Load, Krafttrainings-Volumen)
-4. **Körperliche Verfassung** (Gewicht, Körperfett, Muskelmasse, Hydration)
-5. **Habitica-Statistik** (Produktivität)
-6. **Empfehlungen für heute** (max. 3 konkrete Punkte)
-
-**Wichtig:**
-- Antworte **ausschließlich in Markdown** (kein Plaintext!)
-- Nutze **Überschriften** (##, ###) und **Aufzählungen** für Struktur
-- Sei **präzise und knapp** (max. 200 Wörter)
-- Verwende **keine** Emojis oder Smalltalk
-- Basierend auf den Daten:
-${JSON.stringify(formattedData, null, 2)}
-`;
-
-return [{ json: { prompt: systemPrompt } }];"
+        "functionCode": "// Generiere den Prompt für die KI\nconst dailyData = items[0]?.json[0];\n\nif (!dailyData) {\n  return [{ json: { prompt: 'Keine Daten für heute verfügbar.' } }];\n}\n\n// Formatiere die Daten für den Prompt\nconst formattedData = {\n  datum: dailyData.day_date,\n  hrv: dailyData.hrv_rmssd || '-',\n  ruhepuls: dailyData.resting_heart_rate || '-',\n  schlaf_score: dailyData.sleep_score || '-',\n  cardio_load: dailyData.cardio_load || '-',\n  recovery_score: dailyData.recovery_score || '-',\n  fitness_ctl: dailyData.fitness_ctl || '-',\n  fatigue_atl: dailyData.fatigue_atl || '-',\n  form_tsb: dailyData.form_tsb || '-',\n  strength_volume: dailyData.strength_volume_kg || '-',\n  strength_reps: dailyData.strength_reps || '-',\n  strength_rpe: dailyData.strength_rpe || '-',\n  gewicht: dailyData.weight_kg || '-',\n  koerperfett: dailyData.body_fat_percent || '-',\n  muskelmasse: dailyData.muscle_mass_kg || '-',\n  hydration: dailyData.hydration_percent || '-',\n  completed_tasks: dailyData.completed_tasks || '-',\n  total_tasks: dailyData.total_tasks || '-',\n  completion_rate: dailyData.completion_rate || '-'\n};\n\n// System-Prompt für den KI-Coach\nconst systemPrompt = `\nDu bist ein erfahrener Athletik-Coach und Analyst. Analysiere die folgenden Daten und erstelle eine \n**kompakte, strukturierte Zusammenfassung** mit:\n\n1. **Aktueller Status** (1-2 Sätze)\n2. **Schlaf & Regeneration** (HRV, Ruhepuls, Schlaf-Score)\n3. **Trainingsbelastung** (CTL/ATL/TSB, Cardio-Load, Krafttrainings-Volumen)\n4. **Körperliche Verfassung** (Gewicht, Körperfett, Muskelmasse, Hydration)\n5. **Habitica-Statistik** (Produktivität)\n6. **Empfehlungen für heute** (max. 3 konkrete Punkte)\n\n**Wichtig:**\n- Antworte **ausschließlich in Markdown** (kein Plaintext!)\n- Nutze **Überschriften** (##, ###) und **Aufzählungen** für Struktur\n- Sei **präzise und knapp** (max. 200 Wörter)\n- Verwende **keine** Emojis oder Smalltalk\n- Basierend auf den Daten:\n${JSON.stringify(formattedData, null, 2)}\n`;\n\nreturn [{ json: { prompt: systemPrompt } }];"
       },
       "id": "generate-ai-prompt",
       "name": "Generate AI Prompt",
@@ -271,27 +220,7 @@ return [{ json: { prompt: systemPrompt } }];"
     },
     {
       "parameters": {
-        "functionCode": "// Extrahiere die KI-Antwort aus dem Ollama-Response
-const response = items[0]?.json;
-
-if (!response || !response.response) {
-  return [{ json: { markdown: 'Keine Antwort von der KI erhalten.' } }];
-}
-
-// Die Antwort ist in response.response
-const aiResponse = response.response;
-
-// Erstelle das finale Markdown-Dokument
-const finalMarkdown = `# Athletik Dashboard - ${new Date().toLocaleDateString('de-DE')}
-
-${aiResponse}
-
----
-*Generiert am: ${new Date().toLocaleString('de-DE')}*
-*Modell: ${response.model || 'Unbekannt'}*
-`;
-
-return [{ json: { markdown: finalMarkdown, filename: `00_Athletik_Dashboard_${new Date().toISOString().split('T')[0]}.md` } }];"
+        "functionCode": "// Extrahiere die KI-Antwort aus dem Ollama-Response\nconst response = items[0]?.json;\n\nif (!response || !response.response) {\n  return [{ json: { markdown: 'Keine Antwort von der KI erhalten.' } }];\n}\n\n// Die Antwort ist in response.response\nconst aiResponse = response.response;\n\n// Erstelle das finale Markdown-Dokument\nconst finalMarkdown = `# Athletik Dashboard - ${new Date().toLocaleDateString('de-DE')}\n\n${aiResponse}\n\n---\n*Generiert am: ${new Date().toLocaleString('de-DE')}*\n*Modell: ${response.model || 'Unbekannt'}*\n`;\n\nreturn [{ json: { markdown: finalMarkdown, filename: `00_Athletik_Dashboard_${new Date().toISOString().split('T')[0]}.md` } }];"
       },
       "id": "format-ai-response",
       "name": "Format AI Response",
@@ -337,14 +266,7 @@ return [{ json: { markdown: finalMarkdown, filename: `00_Athletik_Dashboard_${ne
     },
     {
       "parameters": {
-        "functionCode": "// Logge den Erfolg
-console.log('✅ Workflow erfolgreich abgeschlossen:');
-console.log('- Daten aus der DB abgerufen');
-console.log('- KI-Analyse generiert');
-console.log('- Ergebnis in Obsidian gespeichert');
-console.log('- Benachrichtigung an Discord gesendet');
-
-return items;"
+        "functionCode": "// Logge den Erfolg\nconsole.log('✅ Workflow erfolgreich abgeschlossen:');\nconsole.log('- Daten aus der DB abgerufen');\nconsole.log('- KI-Analyse generiert');\nconsole.log('- Ergebnis in Obsidian gespeichert');\nconsole.log('- Benachrichtigung an Discord gesendet');\n\nreturn items;"
       },
       "id": "log-success",
       "name": "Log Success",
