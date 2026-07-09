@@ -55,7 +55,7 @@
       "position": [720, 100],
       "credentials": {
         "postgres": {
-          "id": "timescaledb_credential_id",
+          "id": "",
           "field": "postgres"
         }
       }
@@ -95,7 +95,7 @@
       "position": [720, 250],
       "credentials": {
         "postgres": {
-          "id": "timescaledb_credential_id",
+          "id": "",
           "field": "postgres"
         }
       }
@@ -139,7 +139,7 @@
       "position": [720, 400],
       "credentials": {
         "postgres": {
-          "id": "timescaledb_credential_id",
+          "id": "",
           "field": "postgres"
         }
       }
@@ -179,7 +179,7 @@
       "position": [720, 550],
       "credentials": {
         "postgres": {
-          "id": "timescaledb_credential_id",
+          "id": "",
           "field": "postgres"
         }
       }
@@ -229,7 +229,7 @@
       "position": [720, 700],
       "credentials": {
         "postgres": {
-          "id": "timescaledb_credential_id",
+          "id": "",
           "field": "postgres"
         }
       }
