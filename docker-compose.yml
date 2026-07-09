@@ -38,7 +38,8 @@ services:
       - ./workflows:/home/node/.n8n/workflows  # Workflows persistieren
       - ./certs:/certs:ro  # Optional: SSL-Zertifikate
     ports:
-      - "127.0.0.1:5678:5678"  # Nur lokal zugänglich!
+      - "5678:5678"
+
     restart: unless-stopped
     deploy:
       resources:
