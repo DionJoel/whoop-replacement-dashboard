@@ -1,18 +1,23 @@
-# Minimales Docker-Image für den MCP-Server
-FROM node:20-alpine
+# --- Build-Stage ---
+FROM node:20-alpine AS builder
 
-# Arbeitsverzeichnis
 WORKDIR /app
 
-# Abhängigkeiten installieren
+COPY package.json package-lock.json* ./
+RUN npm ci
+
+COPY . .
+RUN npm run build
+
+# --- Production-Stage ---
+FROM node:20-alpine
+
+WORKDIR /app
+
 COPY package.json package-lock.json* ./
 RUN npm ci --only=production
 
-# Quellcode kopieren
-COPY . .
-
-# Build (falls nicht bereits gebuildet)
-RUN npm run build
+COPY --from=builder /app/dist ./dist
 
 # Port freigeben
 EXPOSE 3000
@@ -25,3 +30,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
 
 # Startbefehl
 CMD ["npm", "run", "start"]
+
