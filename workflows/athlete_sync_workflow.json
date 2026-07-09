@@ -20,17 +20,13 @@
     },
     {
       "parameters": {
-        "authentication": "none",
+        "authentication": "oAuth2",
         "url": "https://www.polaraccesslink.com/v2/users/me/sleep",
         "options": {
           "headers": [
             {
               "name": "Accept",
               "value": "application/json"
-            },
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{$env.POLAR_ACCESS_TOKEN}}"
             }
           ]
         }
@@ -39,8 +35,15 @@
       "name": "Get Polar Sleep Data",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [480, 100]
+      "position": [480, 100],
+      "credentials": {
+        "oAuth2Api": {
+          "id": "polar_oauth2_credential_id",
+          "field": "oauth2"
+        }
+      }
     },
+
     {
       "parameters": {
         "operation": "executeQuery",
