@@ -1,0 +1,81 @@
+{
+  "name": "Final Database Test",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "start",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO polar_metrics (timestamp, hrv_rmssd, resting_heart_rate, sleep_score, cardio_load) VALUES (NOW(), 50, 60, 85, 100) ON CONFLICT DO NOTHING RETURNING id, timestamp, hrv_rmssd, resting_heart_rate, sleep_score, cardio_load;"
+      },
+      "id": "insert_test",
+      "name": "Insert Test Data",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT COUNT(*) as total_records FROM polar_metrics;"
+      },
+      "id": "count_test",
+      "name": "Count Records",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM polar_metrics ORDER BY timestamp DESC LIMIT 1;"
+      },
+      "id": "show_latest",
+      "name": "Show Latest Record",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [850, 300]
+    }
+  ],
+  "connections": {
+    "start": {
+      "main": [
+        [
+          {
+            "node": "insert_test",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "insert_test": {
+      "main": [
+        [
+          {
+            "node": "count_test",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "count_test": {
+      "main": [
+        [
+          {
+            "node": "show_latest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

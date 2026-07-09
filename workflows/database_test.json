@@ -12,7 +12,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT 1 as test_success, current_timestamp as current_time;"
+        "query": "INSERT INTO polar_metrics (timestamp, hrv_rmssd, resting_heart_rate, sleep_score) VALUES (NOW(), 50, 60, 85) ON CONFLICT DO NOTHING RETURNING *;"
       },
       "id": "postgres_test",
       "name": "Test PostgreSQL Connection",
