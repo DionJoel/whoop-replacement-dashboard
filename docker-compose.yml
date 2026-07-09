@@ -54,6 +54,10 @@ services:
       start_period: 60s
     networks:
       - timescale_default
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+
 
   # ============================================
   # Ollama (Lokale KI-Modelle) - OPTIMIERT FÜR 32 GB RAM
@@ -85,6 +89,10 @@ services:
       - OLLAMA_ORIGINS=*
     networks:
       - timescale_default
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+
 
   # ============================================
   # MCP-Server (Fitness-Datenquellen)
@@ -114,6 +122,10 @@ services:
       start_period: 30s
     networks:
       - timescale_default
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+
 
   # Intervals-MCP: https://github.com/mvilanova/intervals-mcp-server
   intervals-mcp:
@@ -140,6 +152,10 @@ services:
       start_period: 30s
     networks:
       - timescale_default
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+
 
   # Cronometer-MCP: https://github.com/modelcontextprotocol/servers/tree/main/src/cronometer
   cronometer-mcp:
@@ -166,6 +182,10 @@ services:
       start_period: 30s
     networks:
       - timescale_default
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+
 
   # ============================================
   # Lokaler MCP-Server (TimescaleDB-Tools für Claude)
