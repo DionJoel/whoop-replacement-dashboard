@@ -31,7 +31,7 @@
       "position": [450, 300],
       "credentials": {
         "postgres": {
-          "id": "postgres_credentials",
+          "id": "",
           "field": "credentials"
         }
       }
