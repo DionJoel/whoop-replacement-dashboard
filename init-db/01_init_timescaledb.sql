@@ -9,9 +9,12 @@ CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;
 -- Tabellen für Rohdaten (Hypertables)
 -- ============================================
 
+-- Drop old tables if they exist from failed attempts
+DROP TABLE IF EXISTS polar_metrics, intervals_metrics, habitica_events, withings_metrics CASCADE;
+
 -- Tabelle für Polar HRV & Schlafmetriken
 CREATE TABLE IF NOT EXISTS polar_metrics (
-    id SERIAL PRIMARY KEY,
+    id SERIAL,
     timestamp TIMESTAMPTZ NOT NULL,
     hrv_rmssd REAL,
     resting_heart_rate INT,
@@ -21,7 +24,8 @@ CREATE TABLE IF NOT EXISTS polar_metrics (
     rem_sleep_minutes INT,
     light_sleep_minutes INT,
     sleep_efficiency REAL,
-    recovery_score INT
+    recovery_score INT,
+    PRIMARY KEY (id, timestamp)
 );
 
 -- Hypertable für Polar-Daten (tägliche Chunks)
@@ -43,7 +47,7 @@ SELECT add_retention_policy('polar_metrics', INTERVAL '2 years');
 
 -- Tabelle für Intervals.icu Form- und Wellness-Metriken
 CREATE TABLE IF NOT EXISTS intervals_metrics (
-    id SERIAL PRIMARY KEY,
+    id SERIAL,
     timestamp TIMESTAMPTZ NOT NULL,
     ctl REAL,
     atl REAL,
@@ -52,7 +56,8 @@ CREATE TABLE IF NOT EXISTS intervals_metrics (
     fatigue_score REAL,
     form_score REAL,
     stress_score REAL,
-    wellness_score REAL
+    wellness_score REAL,
+    PRIMARY KEY (id, timestamp)
 );
 
 -- Hypertable für Intervals-Daten
@@ -74,7 +79,7 @@ SELECT add_retention_policy('intervals_metrics', INTERVAL '2 years');
 
 -- Tabelle für Habitica-Aufgaben und Gewohnheits-Events
 CREATE TABLE IF NOT EXISTS habitica_events (
-    id SERIAL PRIMARY KEY,
+    id SERIAL,
     timestamp TIMESTAMPTZ NOT NULL,
     user_id TEXT,
     task_id TEXT,
@@ -83,7 +88,8 @@ CREATE TABLE IF NOT EXISTS habitica_events (
     score REAL,
     notes TEXT,
     difficulty REAL,
-    tags TEXT[]
+    tags TEXT[],
+    PRIMARY KEY (id, timestamp)
 );
 
 -- Hypertable für Habitica-Daten
@@ -107,7 +113,7 @@ SELECT add_retention_policy('habitica_events', INTERVAL '2 years');
 
 -- Tabelle für Withings Messwerte
 CREATE TABLE IF NOT EXISTS withings_metrics (
-    id SERIAL PRIMARY KEY,
+    id SERIAL,
     timestamp TIMESTAMPTZ NOT NULL,
     weight_kg REAL,
     body_fat_percent REAL,
@@ -117,7 +123,8 @@ CREATE TABLE IF NOT EXISTS withings_metrics (
     visceral_fat_level REAL,
     heart_rate INT,
     systolic_bp INT,
-    diastolic_bp INT
+    diastolic_bp INT,
+    PRIMARY KEY (id, timestamp)
 );
 
 -- Hypertable für Withings-Daten
@@ -134,6 +141,7 @@ CREATE INDEX IF NOT EXISTS idx_withings_metrics_timestamp ON withings_metrics(ti
 
 -- Retention Policy
 SELECT add_retention_policy('withings_metrics', INTERVAL '2 years');
+
 
 -- ============================================
 -- Aggregierte Views für Analysen
