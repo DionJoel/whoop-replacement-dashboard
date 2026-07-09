@@ -38,7 +38,7 @@
       "position": [480, 100],
       "credentials": {
         "oAuth2Api": {
-          "id": "polar_oauth2_credential_id",
+          "id": "",
           "field": "oauth2"
         }
       }

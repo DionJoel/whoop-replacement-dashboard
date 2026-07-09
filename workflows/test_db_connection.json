@@ -1,0 +1,82 @@
+{
+  "name": "Test Database Connection",
+  "nodes": [
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "test_data",
+              "value": "Database connection test"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "manual_trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO polar_metrics (timestamp, hrv_rmssd, resting_heart_rate, sleep_score, cardio_load) VALUES (NOW(), 50, 60, 85, 100) ON CONFLICT DO NOTHING;"
+      },
+      "id": "postgres",
+      "name": "PostgreSQL",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [450, 300],
+      "credentials": {
+        "postgres": {
+          "id": "postgres_credentials",
+          "field": "credentials"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "response",
+              "value": "={{$node[\"postgres\"].data}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set",
+      "name": "Set",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [650, 300]
+    }
+  ],
+  "connections": {
+    "manual_trigger": {
+      "main": [
+        [
+          {
+            "node": "postgres",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "postgres": {
+      "main": [
+        [
+          {
+            "node": "set",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
