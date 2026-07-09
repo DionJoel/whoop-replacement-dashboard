@@ -64,19 +64,12 @@
     },
     {
       "parameters": {
-        "subject": "❌ Ollama nicht verfügbar",
-        "text": "Der Ollama-Server ist nicht erreichbar. Bitte prüfe den Container-Status.",
-        "toEmail": "={{ $env.SMTP_TO }}",
-        "fromEmail": "={{ $env.SMTP_FROM }}",
-        "smtpHost": "={{ $env.SMTP_HOST }}",
-        "smtpPort": "={{ $env.SMTP_PORT }}",
-        "smtpUser": "={{ $env.SMTP_USER }}",
-        "smtpPass": "={{ $env.SMTP_PASSWORD }}",
-        "smtpSecure": "={{ $env.SMTP_SECURE === 'true' }}"
+        "webhookUrl": "={{ $env.DISCORD_WEBHOOK_URL }}",
+        "text": "🚨 **FEHLER im Daily AI Coach Workflow!**\n\nNode: Ollama Health Check\nFehler: Ollama-Server ist nicht erreichbar. Bitte prüfe den Container-Status."
       },
       "id": "send-ollama-error",
-      "name": "Send Ollama Error Email",
-      "type": "n8n-nodes-base.emailSend",
+      "name": "Send Ollama Error to Discord",
+      "type": "n8n-nodes-base.discord",
       "typeVersion": 2,
       "position": [
         850,
@@ -126,19 +119,12 @@
     },
     {
       "parameters": {
-        "subject": "❌ Datenbank nicht verfügbar",
-        "text": "Die TimescaleDB ist nicht erreichbar. Bitte prüfe den Container-Status.",
-        "toEmail": "={{ $env.SMTP_TO }}",
-        "fromEmail": "={{ $env.SMTP_FROM }}",
-        "smtpHost": "={{ $env.SMTP_HOST }}",
-        "smtpPort": "={{ $env.SMTP_PORT }}",
-        "smtpUser": "={{ $env.SMTP_USER }}",
-        "smtpPass": "={{ $env.SMTP_PASSWORD }}",
-        "smtpSecure": "={{ $env.SMTP_SECURE === 'true' }}"
+        "webhookUrl": "={{ $env.DISCORD_WEBHOOK_URL }}",
+        "text": "🚨 **FEHLER im Daily AI Coach Workflow!**\n\nNode: DB Health Check\nFehler: Die TimescaleDB ist nicht erreichbar. Bitte prüfe den Container-Status."
       },
       "id": "send-db-error",
-      "name": "Send DB Error Email",
-      "type": "n8n-nodes-base.emailSend",
+      "name": "Send DB Error to Discord",
+      "type": "n8n-nodes-base.discord",
       "typeVersion": 2,
       "position": [
         850,
@@ -337,19 +323,12 @@ return [{ json: { markdown: finalMarkdown, filename: `00_Athletik_Dashboard_${ne
     },
     {
       "parameters": {
-        "subject": "✅ Tägliches Athletik Dashboard generiert",
-        "text": "Das tägliche Athletik Dashboard wurde erfolgreich generiert und in Obsidian gespeichert.",
-        "toEmail": "={{ $env.SMTP_TO }}",
-        "fromEmail": "={{ $env.SMTP_FROM }}",
-        "smtpHost": "={{ $env.SMTP_HOST }}",
-        "smtpPort": "={{ $env.SMTP_PORT }}",
-        "smtpUser": "={{ $env.SMTP_USER }}",
-        "smtpPass": "={{ $env.SMTP_PASSWORD }}",
-        "smtpSecure": "={{ $env.SMTP_SECURE === 'true' }}"
+        "webhookUrl": "={{ $env.DISCORD_WEBHOOK_URL }}",
+        "text": "🚀 **Dein Daily AI Coach Briefing**\n\n{{ $node[\"Format AI Response\"].json[\"markdown\"] }}"
       },
-      "id": "send-success-email",
-      "name": "Send Success Email",
-      "type": "n8n-nodes-base.emailSend",
+      "id": "send-success-discord",
+      "name": "Send Success to Discord",
+      "type": "n8n-nodes-base.discord",
       "typeVersion": 2,
       "position": [
         2050,
@@ -363,7 +342,7 @@ console.log('✅ Workflow erfolgreich abgeschlossen:');
 console.log('- Daten aus der DB abgerufen');
 console.log('- KI-Analyse generiert');
 console.log('- Ergebnis in Obsidian gespeichert');
-console.log('- Benachrichtigungs-E-Mail gesendet');
+console.log('- Benachrichtigung an Discord gesendet');
 
 return items;"
       },
@@ -378,19 +357,12 @@ return items;"
     },
     {
       "parameters": {
-        "subject": "⚠️ Keine Daten für heute verfügbar",
-        "text": "Es wurden keine Daten für heute in der Datenbank gefunden. Bitte prüfe die API-Integration.",
-        "toEmail": "={{ $env.SMTP_TO }}",
-        "fromEmail": "={{ $env.SMTP_FROM }}",
-        "smtpHost": "={{ $env.SMTP_HOST }}",
-        "smtpPort": "={{ $env.SMTP_PORT }}",
-        "smtpUser": "={{ $env.SMTP_USER }}",
-        "smtpPass": "={{ $env.SMTP_PASSWORD }}",
-        "smtpSecure": "={{ $env.SMTP_SECURE === 'true' }}"
+        "webhookUrl": "={{ $env.DISCORD_WEBHOOK_URL }}",
+        "text": "⚠️ **WARNUNG im Daily AI Coach Workflow!**\n\nEs wurden keine Daten für den gestrigen Tag in der Datenbank gefunden. Bitte prüfe die API-Integrationen."
       },
-      "id": "send-no-data-email",
-      "name": "Send No Data Email",
-      "type": "n8n-nodes-base.emailSend",
+      "id": "send-no-data-warning",
+      "name": "Send No Data Warning to Discord",
+      "type": "n8n-nodes-base.discord",
       "typeVersion": 2,
       "position": [
         1450,
@@ -483,7 +455,7 @@ return items;"
       "main": [
         [
           {
-            "node": "send-no-data-email",
+            "node": "send-no-data-warning",
             "type": "main",
             "index": 0
           }
@@ -534,14 +506,14 @@ return items;"
       "main": [
         [
           {
-            "node": "send-success-email",
+            "node": "send-success-discord",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "send-success-email": {
+    "send-success-discord": {
       "main": [
         [
           {

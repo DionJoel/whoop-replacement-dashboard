@@ -40,7 +40,6 @@ Importiere `workflows/athlete_sync_workflow.json` in dein n8n und richte die API
 - Polar: OAuth2-Credentials
 - Intervals: `INTERVALS_API_TOKEN`
 - Habitica: `HABITICA_USER_ID` + `HABITICA_API_TOKEN`
-- Hevy: `HEVY_API_KEY`
 - Withings: OAuth2-Credentials (via EU Medical Cloud)
   * **Auth URL:** `https://account.withings.com/oauth2_user/authorize2`
   * **Access Token URL:** `https://wbsapi.withings.net/v2/oauth2`
@@ -92,7 +91,6 @@ Wenn du Portainer verwendest, kannst du diesen Ordner als Git-Repo-Stack einbind
 
 ## 🚀 Features & Datenquellen
 * **Polar Open Access API:** Abruf von HRV (RMSSD), Ruhepuls und Schlaf-Scores via Polar Loop.
-* **Hevy App API:** Erfassung von Krafttraining & Cross-X (Volumen, Reps, RPE, Übungen) via zeitgesteuertem API-Pull.
 * **Intervals.icu API:** Direktes Auslesen deiner kardiovaskulären Formkurve (CTL/Fitness, ATL/Fatigue, TSB/Form).
 * **Habitica API:** Tracking deiner täglichen Gewohnheiten und Disziplin (z. B. Uni-Lernzeiten, Stretching).
 * **Storage (TimescaleDB):** PostgreSQL-Zeitreihendatenbank, die über optimierte SQL-Views monatliche und quartalsweise CSV-Aggregate für LLMs mundgerecht vorbereitet.

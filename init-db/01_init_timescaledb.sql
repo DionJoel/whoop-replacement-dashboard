@@ -41,39 +41,6 @@ SELECT add_retention_policy('polar_metrics', INTERVAL '2 years');
 
 -- ============================================
 
--- Tabelle für Hevy Krafttraining
-CREATE TABLE IF NOT EXISTS hevy_workouts (
-    id SERIAL PRIMARY KEY,
-    timestamp TIMESTAMPTZ NOT NULL,
-    workout_id UUID NOT NULL,
-    exercise_name TEXT NOT NULL,
-    volume_kg REAL,
-    reps INT,
-    rpe REAL,
-    sets INT,
-    workout_duration_minutes INT,
-    notes TEXT
-);
-
--- Hypertable für Hevy-Daten
-SELECT create_hypertable(
-    'hevy_workouts',
-    'timestamp',
-    if_not_exists => TRUE,
-    chunk_time_interval => INTERVAL '7 days',
-    create_default_indexes => TRUE
-);
-
--- Index für Workout-ID und Übungsname
-CREATE INDEX IF NOT EXISTS idx_hevy_workouts_workout_id ON hevy_workouts(workout_id);
-CREATE INDEX IF NOT EXISTS idx_hevy_workouts_exercise ON hevy_workouts(exercise_name);
-CREATE INDEX IF NOT EXISTS idx_hevy_workouts_timestamp ON hevy_workouts(timestamp);
-
--- Retention Policy
-SELECT add_retention_policy('hevy_workouts', INTERVAL '2 years');
-
--- ============================================
-
 -- Tabelle für Intervals.icu Form- und Wellness-Metriken
 CREATE TABLE IF NOT EXISTS intervals_metrics (
     id SERIAL PRIMARY KEY,
@@ -175,7 +142,7 @@ SELECT add_retention_policy('withings_metrics', INTERVAL '2 years');
 -- Wochenaggregierte Trend-View für LLM/CSV-Export
 CREATE OR REPLACE VIEW view_athlete_weekly_trends AS
 SELECT
-  coalesce(p.week_start, i.week_start, h.week_start, w.week_start, hab.week_start) AS week_start,
+  coalesce(p.week_start, i.week_start, w.week_start, hab.week_start) AS week_start,
   -- Polar Metriken
   p.avg_hrv,
   p.avg_resting_hr,
@@ -190,11 +157,6 @@ SELECT
   i.avg_fitness_score,
   i.avg_fatigue_score,
   i.avg_form_score,
-  -- Hevy Metriken
-  h.total_volume_kg,
-  h.total_reps,
-  h.avg_rpe,
-  h.total_workouts,
   -- Withings Metriken
   w.avg_weight,
   w.avg_body_fat,
@@ -228,22 +190,13 @@ FULL OUTER JOIN (
 ) i ON p.week_start = i.week_start
 FULL OUTER JOIN (
   SELECT date_trunc('week', timestamp) AS week_start,
-         sum(volume_kg) AS total_volume_kg,
-         sum(reps) AS total_reps,
-         avg(rpe) AS avg_rpe,
-         count(DISTINCT workout_id) AS total_workouts
-  FROM hevy_workouts
-  GROUP BY week_start
-) h ON coalesce(p.week_start, i.week_start) = h.week_start
-FULL OUTER JOIN (
-  SELECT date_trunc('week', timestamp) AS week_start,
          avg(weight_kg) AS avg_weight,
          avg(body_fat_percent) AS avg_body_fat,
          avg(muscle_mass_kg) AS avg_muscle_mass,
          avg(hydration_percent) AS avg_hydration
   FROM withings_metrics
   GROUP BY week_start
-) w ON coalesce(p.week_start, i.week_start, h.week_start) = w.week_start
+) w ON coalesce(p.week_start, i.week_start) = w.week_start
 FULL OUTER JOIN (
   SELECT date_trunc('week', timestamp) AS week_start,
          count(*) FILTER (WHERE completed) AS completed_tasks,
@@ -251,7 +204,7 @@ FULL OUTER JOIN (
          round(100.0 * count(*) FILTER (WHERE completed) / nullif(count(*), 0), 1) AS completion_rate
   FROM habitica_events
   GROUP BY week_start
-) hab ON coalesce(p.week_start, i.week_start, h.week_start, w.week_start) = hab.week_start;
+) hab ON coalesce(p.week_start, i.week_start, w.week_start) = hab.week_start;
 
 -- Wochenaggregierte Habitica-View
 CREATE OR REPLACE VIEW view_athlete_weekly_habits AS
@@ -266,25 +219,12 @@ FROM habitica_events
 GROUP BY week_start
 ORDER BY week_start DESC;
 
--- Wochenaggregierte Hevy-View
-CREATE OR REPLACE VIEW view_hevy_weekly_volume AS
-SELECT
-  date_trunc('week', timestamp) AS week_start,
-  sum(volume_kg) AS total_volume_kg,
-  sum(reps) AS total_reps,
-  avg(rpe) AS avg_rpe,
-  count(DISTINCT workout_id) AS total_workouts,
-  sum(workout_duration_minutes) AS total_duration_minutes
-FROM hevy_workouts
-GROUP BY week_start
-ORDER BY week_start DESC;
-
 -- ============================================
 -- Tägliche Aggregation für den KI-Morgen-Newsletter
 -- ============================================
 CREATE OR REPLACE VIEW view_ai_daily_context AS
 SELECT
-  coalesce(p.day_date, i.day_date, h.day_date, w.day_date, hab.day_date) AS day_date,
+  coalesce(p.day_date, i.day_date, w.day_date, hab.day_date) AS day_date,
   -- Polar Metriken
   p.avg_hrv AS hrv_rmssd,
   p.avg_resting_hr AS resting_heart_rate,
@@ -297,10 +237,6 @@ SELECT
   i.avg_tsb AS form_tsb,
   i.avg_fitness_score AS fitness_score,
   i.avg_fatigue_score AS fatigue_score,
-  -- Hevy Metriken
-  h.total_volume_kg AS strength_volume_kg,
-  h.total_reps AS strength_reps,
-  h.avg_rpe AS strength_rpe,
   -- Withings Metriken
   w.avg_weight AS weight_kg,
   w.avg_body_fat AS body_fat_percent,
@@ -330,26 +266,19 @@ FULL OUTER JOIN (
 ) i ON p.day_date = i.day_date
 FULL OUTER JOIN (
   SELECT date_trunc('day', timestamp)::date AS day_date,
-         sum(volume_kg) AS total_volume_kg,
-         sum(reps) AS total_reps,
-         avg(rpe) AS avg_rpe
-  FROM hevy_workouts GROUP BY 1
-) h ON coalesce(p.day_date, i.day_date) = h.day_date
-FULL OUTER JOIN (
-  SELECT date_trunc('day', timestamp)::date AS day_date,
          avg(weight_kg) AS avg_weight,
          avg(body_fat_percent) AS avg_body_fat,
          avg(muscle_mass_kg) AS avg_muscle_mass,
          avg(hydration_percent) AS avg_hydration
   FROM withings_metrics GROUP BY 1
-) w ON coalesce(p.day_date, i.day_date, h.day_date) = w.day_date
+) w ON coalesce(p.day_date, i.day_date) = w.day_date
 FULL OUTER JOIN (
   SELECT date_trunc('day', timestamp)::date AS day_date,
          count(*) FILTER (WHERE completed) AS completed_tasks,
          count(*) AS total_tasks,
          round(100.0 * count(*) FILTER (WHERE completed) / nullif(count(*), 0), 1) AS completion_rate
   FROM habitica_events GROUP BY 1
-) hab ON coalesce(p.day_date, i.day_date, h.day_date, w.day_date) = hab.day_date;
+) hab ON coalesce(p.day_date, i.day_date, w.day_date) = hab.day_date;
 
 -- ============================================
 -- Materialisierte View für schnelle Abfragen (optional)

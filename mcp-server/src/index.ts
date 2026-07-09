@@ -155,27 +155,6 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
-        name: 'get_hevy_volume',
-        description:
-          'Holt die wöchentlichen Krafttrainings-Volumen-Daten (Hevy).',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            limit: {
-              type: 'number',
-              description: 'Anzahl der Wochen (Standard: 4)',
-              default: 4,
-            },
-            format: {
-              type: 'string',
-              enum: ['markdown', 'csv'],
-              description: 'Ausgabeformat (Standard: markdown)',
-              default: 'markdown',
-            },
-          },
-        },
-      },
-      {
         name: 'get_habitica_stats',
         description:
           'Holt die wöchentlichen Habitica-Statistiken (erledigte Aufgaben, etc.).',
@@ -318,49 +297,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               {
                 type: 'text',
                 text: sqlToMarkdown(result.rows, `Täglicher Kontext (letzte ${days} Tage)`),
-              },
-            ],
-          };
-        }
-      }
-
-      case 'get_hevy_volume': {
-        const limit = (args as any)?.limit ?? 4;
-        const format = (args as any)?.format ?? 'markdown';
-
-        const query = `
-          SELECT * FROM view_hevy_weekly_volume
-          ORDER BY week_start DESC
-          LIMIT $1
-        `;
-        const result = await pool.query(query, [limit]);
-
-        if (result.rows.length === 0) {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: 'Keine Hevy-Volumen-Daten in der Datenbank gefunden.',
-              },
-            ],
-          };
-        }
-
-        if (format === 'csv') {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: sqlToCsv(result.rows),
-              },
-            ],
-          };
-        } else {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: sqlToMarkdown(result.rows, 'Wöchentliches Krafttrainings-Volumen'),
               },
             ],
           };

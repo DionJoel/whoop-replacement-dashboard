@@ -11,11 +11,11 @@ Dieses Konzept beschreibt den schrittweisen Implementierungsplan für das hybrid
 │                    FUJITSU (i7-6700T, 32GB RAM)                  │
 │                                                                  │
 │  ┌────────────────────────────────────────────────────────┐  │
-│  │                 Docker-Container                         │  │
-│  │  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐   │  │
-│  │  │Polar-MCP│  │Intervals│  │ Hevy-MCP │  │Garmin-MCP│   │  │
-│  │  │ 3000   │  │ -MCP    │  │ 3002    │  │ 3003    │   │  │
-│  │  │        │  │ 3001    │  │         │  │         │   │  │
+│  │                 Docker-Container (Dieser Stack)            │  │
+│  │  ┌─────────┐  ┌─────────┐                                │  │
+│  │  │Polar-MCP│  │Intervals│                                │  │
+│  │  │ 3000   │  │ -MCP    │                                │  │
+│  │  │        │  │ 3001    │  │         │                  │  │
 │  │  └────┬────┘  └────┬────┘  └────┬────┘  └────┬────┘   │  │
 │  │       │           │           │           │          │  │
 │  │       └───────────┴───────────┴───────────┴──────────┘  │  │
@@ -23,11 +23,8 @@ Dieses Konzept beschreibt den schrittweisen Implementierungsplan für das hybrid
 │  │                          v                              │  │
 │  │               ┌───────────────┐                          │  │
 │  │               │  TimescaleDB  │                          │  │
-│  │               │  (view_ai_   │                          │  │
-│  │               │   daily_      │                          │  │
-│  │               │   context)    │                          │  │
-│  │               └──────┬────────┘                          │  │
-│  │                      │                                   │  │
+│  │               │ (Externer     │ <------------------------┘  │
+│  │               │  Stack)       │                          │  │
 │  │                      v                                   │  │
 │  │               ┌───────────────┐                          │  │
 │  │               │    n8n        │                          │  │
@@ -48,15 +45,15 @@ Dieses Konzept beschreibt den schrittweisen Implementierungsplan für das hybrid
 │  │               └───────────────┘                          │  │
 │  └────────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
-       ↑                                     ↑
-       │                                     │
-[Withings-MCP]                    [Cronometer-MCP]
+                                               ↑
+                                               │
+[Withings-MCP (Public)]           [Cronometer-MCP (Lokal)]
 (https://withings-mcp.com)         (Port 3004)
        ↑                                     ↑
        └─────────────────────────────────────┬─────────────┘
                                          │
-                                         v
-                                 [Claude Desktop]
+                                         v (Optional)
+                                 [Claude Desktop für interaktive Analyse]
 ```
 Sprints — Überblick
 Sprint 1 — Lokale Infrastruktur & Datenbank (Basis)
@@ -87,8 +84,6 @@ Ziel: Alle Fitness-Datenquellen über **selbstgehostete MCP-Server** verfügbar 
 * Repositories klonen (oder Docker-Images nutzen):
   - [Polar-MCP](https://github.com/NelsonNew/polar-mcp-server) (Port 3000)
   - [Intervals-MCP](https://github.com/mvilanova/intervals-mcp-server) (Port 3001)
-  - [Hevy-MCP](https://github.com/chrisdoc/hevy-mcp) (Port 3002)
-  - [Garmin-MCP](https://github.com/Taxuspt/garmin_mcp) (Port 3003) – **für deine Fenix 6 Pro Sapphire!**
   - Withings: **Öffentlicher Server** (`https://withings-mcp.com/mcp`) – kein Selbsthost nötig
 
 [ ] Task 2.2 — Docker‑Compose für MCP‑Server erstellen
@@ -109,21 +104,6 @@ Ziel: Alle Fitness-Datenquellen über **selbstgehostete MCP-Server** verfügbar 
       environment:
         - INTERVALS_KEY=${INTERVALS_KEY}
         - ATHLETE_ID=${ATHLETE_ID}
-      networks: [app_network]
-    
-    hevy-mcp:
-      build: ./mcp-servers/hevy-mcp
-      ports: ["127.0.0.1:3002:3002"]
-      environment:
-        - HEVY_API_KEY=${HEVY_API_KEY}
-      networks: [app_network]
-    
-    garmin-mcp:
-      build: ./mcp-servers/garmin_mcp
-      ports: ["127.0.0.1:3003:3003"]
-      environment:
-        - GARMIN_CLIENT_ID=${GARMIN_CLIENT_ID}
-        - GARMIN_CLIENT_SECRET=${GARMIN_CLIENT_SECRET}
       networks: [app_network]
   ```
 * **Withings-MCP** wird **nicht selbst gehostet** (öffentlicher Server).

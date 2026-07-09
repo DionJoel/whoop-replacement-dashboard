@@ -1,73 +1,29 @@
 version: '3.8'
 
-# --- Netzwerk-Konfiguration (isoliert für Sicherheit) ---
+# --- Netzwerk-Konfiguration ---
 networks:
-  app_network:
-    driver: bridge
-    internal: false  # Erlaubt Zugriff von Host (für Portainer/SSH), aber nicht von außen
+  timescale_default: # Verbindet sich mit dem Netzwerk des 'timescale' Stacks
+    external: true
+    name: timescale_default
 
 # --- Volumes für persistente Daten ---
 volumes:
-  timescaledb_data:
-    driver: local
   n8n_data:
     driver: local
   ollama_data:
     driver: local
 
-# --- Services ---
 services:
-  # ============================================
-  # TimescaleDB (PostgreSQL mit Timescale-Erweiterung)
-  # ============================================
-  timescaledb:
-    image: timescale/timescaledb:latest-pg15
-    container_name: timescaledb
-    env_file:
-      - .env
-    environment:
-      - POSTGRES_USER=${POSTGRES_USER:-postgres}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
-      - POSTGRES_DB=${POSTGRES_DB:-whoop_dashboard}
-      - TIMESCALEDB_TELEMETRY=off  # Deaktiviert Telemetrie
-    volumes:
-      - timescaledb_data:/var/lib/postgresql/data
-      - ./init-db:/docker-entrypoint-initdb.d
-    ports:
-      - "127.0.0.1:5432:5432"  # Nur lokal zugänglich!
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 8G
-          cpus: 2.0
-        reservations:
-          memory: 2G
-          cpus: 0.5
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-whoop_dashboard}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-    networks:
-      - app_network
-
-  # ============================================
-  # n8n (Workflow-Automation)
-  # ============================================
   n8n:
     image: docker.n8n.io/n8nio/n8n:latest
     container_name: n8n
-    env_file:
-      - .env
     environment:
       - DB_TYPE=postgresdb
-      - DB_POSTGRESDB_HOST=timescaledb
-      - DB_POSTGRESDB_PORT=5432
-      - DB_POSTGRESDB_DATABASE=${POSTGRES_DB}
-      - DB_POSTGRESDB_USER=${POSTGRES_USER}
-      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_POSTGRESDB_HOST=${DB_HOST:-timescaledb}
+      - DB_POSTGRESDB_PORT=${DB_PORT:-5432}
+      - DB_POSTGRESDB_DATABASE=${POSTGRES_DB:-athlete_metrics}
+      - DB_POSTGRESDB_USER=${POSTGRES_USER:-dion}
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD:-change_me}
       - WEBHOOK_URL=${WEBHOOK_URL}
       - GENERIC_TIMEZONE=Europe/Berlin
       - NODE_OPTIONS=--max-old-space-size=4096
@@ -75,10 +31,6 @@ services:
       - N8N_BASIC_AUTH_USER=${N8N_USER:-admin}
       - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD:-change_me}
       - N8N_HOST=0.0.0.0
-      - N8N_PORT=5678
-      - N8N_PROTOCOL=https
-      - N8N_HTTPS_CERT=/certs/fullchain.pem
-      - N8N_HTTPS_KEY=/certs/privkey.pem
     volumes:
       - n8n_data:/home/node/.n8n
       - ./workflows:/home/node/.n8n/workflows  # Workflows persistieren
@@ -100,11 +52,8 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
-    depends_on:
-      timescaledb:
-        condition: service_healthy
     networks:
-      - app_network
+      - timescale_default
 
   # ============================================
   # Ollama (Lokale KI-Modelle) - OPTIMIERT FÜR 32 GB RAM
@@ -135,7 +84,7 @@ services:
       - OLLAMA_HOST=0.0.0.0
       - OLLAMA_ORIGINS=*
     networks:
-      - app_network
+      - timescale_default
 
   # ============================================
   # MCP-Server (Fitness-Datenquellen)
@@ -149,8 +98,8 @@ services:
     ports:
       - "127.0.0.1:3000:3000"  # Nur lokal zugänglich!
     environment:
-      - POLAR_CLIENT_ID=${POLAR_CLIENT_ID}
-      - POLAR_CLIENT_SECRET=${POLAR_CLIENT_SECRET}
+      - POLAR_CLIENT_ID=${POLAR_CLIENT_ID:-dummy_id}
+      - POLAR_CLIENT_SECRET=${POLAR_CLIENT_SECRET:-dummy_secret}
     restart: unless-stopped
     deploy:
       resources:
@@ -164,19 +113,19 @@ services:
       retries: 3
       start_period: 30s
     networks:
-      - app_net
+      - timescale_default
 
   # Intervals-MCP: https://github.com/mvilanova/intervals-mcp-server
   intervals-mcp:
     build:
-      context: ./mcp-servers/intervals-mcp-server
+      context: ./mcp-servers/intervals.icu-mcp-server
       dockerfile: Dockerfile
     container_name: intervals-mcp
     ports:
       - "127.0.0.1:3001:3001"
     environment:
-      - INTERVALS_KEY=${INTERVALS_KEY}
-      - ATHLETE_ID=${ATHLETE_ID}
+      - INTERVALS_KEY=${INTERVALS_KEY:-dummy_key}
+      - ATHLETE_ID=${ATHLETE_ID:-dummy_id}
     restart: unless-stopped
     deploy:
       resources:
@@ -190,70 +139,19 @@ services:
       retries: 3
       start_period: 30s
     networks:
-      - app_net
-
-  # Hevy-MCP: https://github.com/chrisdoc/hevy-mcp
-  hevy-mcp:
-    build:
-      context: ./mcp-servers/hevy-mcp
-      dockerfile: Dockerfile
-    container_name: hevy-mcp
-    ports:
-      - "127.0.0.1:3002:3002"
-    environment:
-      - HEVY_API_KEY=${HEVY_API_KEY}
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-          cpus: 0.5
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3002/mcp"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-    networks:
-      - app_net
-
-  # Garmin-MCP: https://github.com/Taxuspt/garmin_mcp (für Fenix 6 Pro Sapphire)
-  garmin-mcp:
-    build:
-      context: ./mcp-servers/garmin_mcp
-      dockerfile: Dockerfile
-    container_name: garmin-mcp
-    ports:
-      - "127.0.0.1:3003:3003"
-    environment:
-      - GARMIN_CLIENT_ID=${GARMIN_CLIENT_ID}
-      - GARMIN_CLIENT_SECRET=${GARMIN_CLIENT_SECRET}
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-          cpus: 0.5
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3003/mcp"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-    networks:
-      - app_net
+      - timescale_default
 
   # Cronometer-MCP: https://github.com/modelcontextprotocol/servers/tree/main/src/cronometer
   cronometer-mcp:
     build:
-      context: ./mcp-servers/cronometer-api-mcp
+      context: ./mcp-servers/cronometer
       dockerfile: Dockerfile
     container_name: cronometer-mcp
     ports:
       - "127.0.0.1:3004:3004"
     environment:
-      - CRONOMETER_USERNAME=${CRONOMETER_USERNAME}
-      - CRONOMETER_PASSWORD=${CRONOMETER_PASSWORD}
+      - CRONOMETER_USERNAME=${CRONOMETER_USERNAME:-dummy_user}
+      - CRONOMETER_PASSWORD=${CRONOMETER_PASSWORD:-dummy_password}
     restart: unless-stopped
     deploy:
       resources:
@@ -267,29 +165,23 @@ services:
       retries: 3
       start_period: 30s
     networks:
-      - app_net
+      - timescale_default
 
   # ============================================
   # Lokaler MCP-Server (TimescaleDB-Tools für Claude)
   # ============================================
   mcp-server:
     build:
-      context: ./mcp-server
-      dockerfile: Dockerfile
+      context: ./mcp-servers/mcp-server
     container_name: mcp-server
-    working_dir: /app
-    env_file:
-      - .env
     environment:
-      - DB_HOST=timescaledb
-      - DB_PORT=5432
-      - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_HOST=${DB_HOST:-timescaledb}
+      - DB_PORT=${DB_PORT:-5432}
+      - POSTGRES_DB=${POSTGRES_DB:-athlete_metrics}
+      - POSTGRES_USER=${POSTGRES_USER:-dion}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-change_me}
       - MCP_SERVER_PORT=8000
       - NODE_ENV=production
-    volumes:
-      - ./mcp-server:/app
     ports:
       - "127.0.0.1:8000:8000"  # Nur lokal zugänglich!
     restart: unless-stopped
@@ -304,8 +196,5 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
-    depends_on:
-      timescaledb:
-        condition: service_healthy
     networks:
-      - app_network
+      - timescale_default
