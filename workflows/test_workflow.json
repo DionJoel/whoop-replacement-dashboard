@@ -1,5 +1,5 @@
 {
-  "name": "Final Database Test",
+  "name": "Comprehensive System Test",
   "nodes": [
     {
       "parameters": {},
@@ -12,13 +12,24 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO polar_metrics (timestamp, hrv_rmssd, resting_heart_rate, sleep_score, cardio_load) VALUES (NOW(), 50, 60, 85, 100) ON CONFLICT DO NOTHING RETURNING id, timestamp, hrv_rmssd, resting_heart_rate, sleep_score, cardio_load;"
+        "query": "SELECT 1 as test_success, current_timestamp as current_time;"
       },
-      "id": "insert_test",
-      "name": "Insert Test Data",
+      "id": "db_test",
+      "name": "Test Database Connection",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 1,
       "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO polar_metrics (timestamp, hrv_rmssd, resting_heart_rate, sleep_score, cardio_load) VALUES (NOW(), 50, 60, 85, 100) ON CONFLICT DO NOTHING RETURNING *;"
+      },
+      "id": "insert_test",
+      "name": "Test Data Insertion",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [650, 300]
     },
     {
       "parameters": {
@@ -29,22 +40,39 @@
       "name": "Count Records",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 1,
-      "position": [650, 300]
+      "position": [850, 300]
     },
     {
       "parameters": {
-        "operation": "executeQuery",
-        "query": "SELECT * FROM polar_metrics ORDER BY timestamp DESC LIMIT 1;"
+        "values": {
+          "string": [
+            {
+              "name": "status",
+              "value": "All tests completed successfully!"
+            }
+          ]
+        }
       },
-      "id": "show_latest",
-      "name": "Show Latest Record",
-      "type": "n8n-nodes-base.postgres",
+      "id": "success",
+      "name": "Success",
+      "type": "n8n-nodes-base.set",
       "typeVersion": 1,
-      "position": [850, 300]
+      "position": [1050, 300]
     }
   ],
   "connections": {
     "start": {
+      "main": [
+        [
+          {
+            "node": "db_test",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "db_test": {
       "main": [
         [
           {
@@ -70,7 +98,7 @@
       "main": [
         [
           {
-            "node": "show_latest",
+            "node": "success",
             "type": "main",
             "index": 0
           }

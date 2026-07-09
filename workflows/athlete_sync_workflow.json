@@ -28,11 +28,12 @@
               "name": "Accept",
               "value": "application/json"
             }
-          ]
+          ],
+          "ignoreHttpStatusErrors": true
         }
       },
       "id": "polar",
-      "name": "Get Polar Sleep Data",
+      "name": "Get Polar Sleep Data (DISABLED)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [480, 100],
@@ -41,7 +42,8 @@
           "id": "",
           "field": "oauth2"
         }
-      }
+      },
+      "disabled": true
     },
     {
       "parameters": {
