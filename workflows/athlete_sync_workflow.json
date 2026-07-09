@@ -29,21 +29,21 @@
               "value": "application/json"
             }
           ],
-          "ignoreHttpStatusErrors": true
+          "ignoreHttpStatusErrors": true,
+          "retryOnFailure": true
         }
       },
       "id": "polar",
-      "name": "Get Polar Sleep Data (DISABLED)",
+      "name": "Get Polar Sleep Data",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [480, 100],
       "credentials": {
         "oAuth2Api": {
-          "id": "",
+          "id": "polar_oauth2",
           "field": "oauth2"
         }
-      },
-      "disabled": true
+      }
     },
     {
       "parameters": {
