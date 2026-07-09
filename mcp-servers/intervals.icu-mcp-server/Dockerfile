@@ -1,20 +1,26 @@
-# Intervals.icu MCP Server Dockerfile
-FROM node:18-alpine
+FROM python:3.12-slim
 
+# Set working directory
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Install build dependencies and Python build backend
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+       build-essential \
+       curl \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install dependencies
-RUN npm install
+# Install Python build tool
+RUN pip install --no-cache-dir hatchling
 
-# Copy source code
-COPY . .
+# Copy project files
+COPY pyproject.toml pyproject.toml
+COPY src src
+COPY README.md README.md
+COPY .env.example .env.example
 
-# Build if needed
-RUN npm run build
+# Install the package and runtime dependencies
+RUN pip install --no-cache-dir .
 
-EXPOSE 3001
-
-CMD ["npm", "start"]
+# Default command to run the MCP server using stdio transport
+CMD ["mcp", "run", "src/intervals_mcp_server/server.py"]
