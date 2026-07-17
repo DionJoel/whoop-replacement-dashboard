@@ -1,0 +1,154 @@
+{
+  "name": "Polar Token Manager",
+  "nodes": [
+    {
+      "parameters": {
+        "cronExpression": "0 * * * *"  // Jede Stunde ausführen
+      },
+      "id": "hourly_trigger",
+      "name": "Hourly Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "url": "https://httpbin.org/bearer",
+        "options": {
+          "ignoreHttpStatusErrors": true,
+          "errorOnMissingAuth": false
+        }
+      },
+      "id": "token_test",
+      "name": "Test Token",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [450, 300],
+      "credentials": {
+        "oAuth2Api": {
+          "id": "polar_oauth2",
+          "field": "oauth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "token_status",
+              "value": "=\"Token test at: \" & $now.format(\"YYYY-MM-DD HH:mm:ss\")"
+            },
+            {
+              "name": "status_code",
+              "value": "={{$node[\"token_test\"].statusCode}}"
+            }
+          ]
+        }
+      },
+      "id": "log_result",
+      "name": "Log Result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$node[\"token_test\"].statusCode}}",
+              "operation": "equal",
+              "value2": "401"
+            }
+          ]
+        }
+      },
+      "id": "if_401",
+      "name": "If 401 Error",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [850, 200]
+    },
+    {
+      "parameters": {
+        "responseCode": 200,
+        "responseData": {
+          "message": "Token needs refresh"
+        }
+      },
+      "id": "token_expired",
+      "name": "Token Expired",
+      "type": "n8n-nodes-base.responseNode",
+      "typeVersion": 1,
+      "position": [1050, 200]
+    },
+    {
+      "parameters": {
+        "responseCode": 200,
+        "responseData": {
+          "message": "Token is valid"
+        }
+      },
+      "id": "token_valid",
+      "name": "Token Valid",
+      "type": "n8n-nodes-base.responseNode",
+      "typeVersion": 1,
+      "position": [1050, 400]
+    }
+  ],
+  "connections": {
+    "hourly_trigger": {
+      "main": [
+        [
+          {
+            "node": "token_test",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "token_test": {
+      "main": [
+        [
+          {
+            "node": "log_result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "log_result": {
+      "main": [
+        [
+          {
+            "node": "if_401",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "if_401": {
+      "main": [
+        [
+          {
+            "node": "token_expired",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "token_valid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

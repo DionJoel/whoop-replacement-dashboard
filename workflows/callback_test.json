@@ -1,0 +1,80 @@
+{
+  "name": "Polar Callback Test",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "start",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "url": "https://www.polaraccesslink.com/v2/users/me",
+        "options": {
+          "ignoreHttpStatusErrors": true,
+          "errorOnMissingAuth": false,
+          "followRedirect": false
+        }
+      },
+      "id": "polar_api",
+      "name": "Polar API Test",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [450, 300],
+      "credentials": {
+        "oAuth2Api": {
+          "id": "polar_oauth2",
+          "field": "oauth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "response",
+              "value": "={{$node[\"polar_api\"].json}}"
+            },
+            {
+              "name": "status",
+              "value": "={{$node[\"polar_api\"].statusCode}}"
+            }
+          ]
+        }
+      },
+      "id": "capture",
+      "name": "Capture Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [650, 300]
+    }
+  ],
+  "connections": {
+    "start": {
+      "main": [
+        [
+          {
+            "node": "polar_api",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "polar_api": {
+      "main": [
+        [
+          {
+            "node": "capture",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

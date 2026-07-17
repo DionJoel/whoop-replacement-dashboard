@@ -28,7 +28,9 @@
               "name": "Accept",
               "value": "application/json"
             }
-          ]
+          ],
+          "ignoreHttpStatusErrors": true,
+          "errorOnMissingAuth": false
         }
       },
       "id": "polar",
@@ -38,10 +40,11 @@
       "position": [480, 100],
       "credentials": {
         "oAuth2Api": {
-          "id": "polar_oauth2_credential_id",
+          "id": "polar_oauth2",
           "field": "oauth2"
         }
-      }
+      },
+      "errorOnMissingAuth": false
     },
 
     {
@@ -195,7 +198,9 @@
               "name": "Accept",
               "value": "application/json"
             }
-          ]
+          ],
+          "ignoreHttpStatusErrors": true,
+          "errorOnMissingAuth": false
         },
         "bodyParametersUi": {
           "parameter": [
