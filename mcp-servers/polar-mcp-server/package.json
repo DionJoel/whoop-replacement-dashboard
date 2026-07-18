@@ -10,11 +10,12 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
+    "start:http": "node dist/simple-http-server.js",
     "dev": "tsx src/index.ts",
+    "dev:http": "tsx src/simple-http-server.ts",
     "auth": "tsx src/auth.ts",
     "deploy": "wrangler deploy",
-    "dev:worker": "wrangler dev",
-    "prepare": "npm run build"
+    "dev:worker": "wrangler dev"
   },
   "keywords": [
     "mcp",

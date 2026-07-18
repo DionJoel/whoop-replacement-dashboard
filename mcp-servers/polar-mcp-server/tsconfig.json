@@ -13,5 +13,5 @@
     "types": ["node"]
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "src/worker.ts", "src/types.ts", "src/auth"]
+  "exclude": ["node_modules", "dist", "src/worker.ts", "src/types.cloudflare.ts", "src/auth.ts", "src/auth"]
 }

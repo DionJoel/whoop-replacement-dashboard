@@ -20,8 +20,8 @@
     },
     {
       "parameters": {
-        "authentication": "oAuth2",
-        "url": "https://www.polaraccesslink.com/v2/users/me/sleep",
+        "authentication": "none",
+        "url": "http://polar-mcp:3000/tools/get_sleep",
         "options": {
           "headers": [
             {
@@ -29,22 +29,14 @@
               "value": "application/json"
             }
           ],
-          "ignoreHttpStatusErrors": true,
-          "errorOnMissingAuth": false
+          "ignoreHttpStatusErrors": true
         }
       },
       "id": "polar",
       "name": "Get Polar Sleep Data",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [480, 100],
-      "credentials": {
-        "oAuth2Api": {
-          "id": "polar_oauth2",
-          "field": "oauth2"
-        }
-      },
-      "errorOnMissingAuth": false
+      "position": [480, 100]
     },
 
     {

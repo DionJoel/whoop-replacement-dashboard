@@ -1,20 +1,27 @@
-# Polar MCP Server Dockerfile
+# Polar MCP Server Dockerfile - HTTP Version
+# Einfacher Dockerfile für den HTTP-Server
+
 FROM node:20-alpine
 
 WORKDIR /app
 
-# Copy package files
+# Kopiere package files
 COPY package*.json ./
 
-# Install dependencies (skip prepare script since source files are not copied yet)
-RUN npm install --ignore-scripts
+# Installiere Produktions-Dependencies (ohne prepare-Script)
+RUN npm ci --only=production --ignore-scripts
 
-# Copy source code
+# Kopiere Source Code
 COPY . .
 
-# Build
+# Baue TypeScript
 RUN npm run build
 
+# Port freigeben
 EXPOSE 3000
 
-CMD ["npm", "start"]
+# Volume für Token-Persistenz
+VOLUME ["/app/tokens.json"]
+
+# Startbefehl - HTTP Server
+CMD ["npm", "run", "start:http"]
