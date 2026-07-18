@@ -112,11 +112,11 @@ services:
       dockerfile: Dockerfile
     container_name: polar-mcp
     ports:
-      - "127.0.0.1:3000:3000"  # Nur lokal zugänglich!
+      - "127.0.0.1:3010:3000"  # Nur lokal zugänglich!
     environment:
       - POLAR_CLIENT_ID=${POLAR_CLIENT_ID:-dummy_id}
       - POLAR_CLIENT_SECRET=${POLAR_CLIENT_SECRET:-dummy_secret}
-      - POLAR_REDIRECT_URI=http://localhost:5678/rest/oauth2-credential/callback
+      - POLAR_REDIRECT_URI=http://localhost:3010/callback
     volumes:
       - ./mcp-servers/polar-mcp-server/tokens.json:/app/tokens.json
     restart: unless-stopped
@@ -198,34 +198,3 @@ services:
       - 1.1.1.1
 
 
-  # ============================================
-  # Lokaler MCP-Server (TimescaleDB-Tools für Claude)
-  # ============================================
-  mcp-server:
-    build:
-      context: ./mcp-servers/mcp-server
-    container_name: mcp-server
-    environment:
-      - DB_HOST=${DB_HOST:-timescaledb}
-      - DB_PORT=${DB_PORT:-5432}
-      - POSTGRES_DB=${POSTGRES_DB:-athlete_metrics}
-      - POSTGRES_USER=${POSTGRES_USER:-postgres}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-change_me}
-      - MCP_SERVER_PORT=8000
-      - NODE_ENV=production
-    ports:
-      - "127.0.0.1:8009:8000"  # Nur lokal zugänglich!
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-          cpus: 0.5
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-    networks:
-      - timescale_default
