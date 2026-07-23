@@ -82,8 +82,8 @@ Ziel: Alle Fitness-Datenquellen über **selbstgehostete MCP-Server** verfügbar 
 
 [ ] Task 2.1 — MCP‑Server Repositories vorbereiten
 * Repositories klonen (oder Docker-Images nutzen):
-  - [Polar-MCP](https://github.com/NelsonNew/polar-mcp-server) (Port 3000)
-  - [Intervals-MCP](https://github.com/mvilanova/intervals-mcp-server) (Port 3001)
+  - [Intervals-MCP](https://github.com/mvilanova/intervals-mcp-server) (Port 3001) – **einfachster Start (nur API-Key + Athlete ID)**
+  - [Polar-MCP](https://github.com/NelsonNew/polar-mcp-server) (Port 3000) – OAuth2-Flow
   - Withings: **Öffentlicher Server** (`https://withings-mcp.com/mcp`) – kein Selbsthost nötig
 
 [ ] Task 2.2 — Docker‑Compose für MCP‑Server erstellen
