@@ -145,10 +145,11 @@ services:
       dockerfile: Dockerfile
     container_name: intervals-mcp
     ports:
-      - "127.0.0.1:3001:3001"
+      - "127.0.0.1:3001:8000"
     environment:
       - INTERVALS_KEY=${INTERVALS_KEY:-dummy_key}
       - ATHLETE_ID=${ATHLETE_ID:-dummy_id}
+      - MCP_TRANSPORT=http
     restart: unless-stopped
     deploy:
       resources:

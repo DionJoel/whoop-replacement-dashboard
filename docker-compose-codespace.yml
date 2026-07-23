@@ -126,14 +126,17 @@ services:
   # Intervals-MCP
   intervals-mcp:
     build:
-      context: ./mcp-servers/intervals-mcp-server
+      context: ./mcp-servers/intervals.icu-mcp-server
       dockerfile: Dockerfile
     container_name: intervals-mcp
     ports:
-      - "3001:3001"
+      - "3001:8000"
     environment:
       - INTERVALS_KEY=${INTERVALS_KEY}
       - ATHLETE_ID=${ATHLETE_ID}
+      - MCP_TRANSPORT=http
+      - MCP_HOST=0.0.0.0
+      - MCP_PORT=8000
     restart: unless-stopped
     deploy:
       resources:
